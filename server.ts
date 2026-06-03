@@ -226,8 +226,20 @@ app.post('/api/rebalance', async (req: Request, res: Response) => {
 
     const updatedDistribution = { ...currentDistribution };
     const shiftAmount = Math.min(trafficShiftPercentage, updatedDistribution[sourceDistKey]);
-    updatedDistribution[sourceDistKey] = Math.max(0, updatedDistribution[sourceDistKey] - shiftAmount);
-    updatedDistribution[targetDistKey] = Math.min(100, updatedDistribution[targetDistKey] + shiftAmount);
+    const mutatedSourceWeight = parseFloat(
+      Math.max(0, updatedDistribution[sourceDistKey] - shiftAmount).toFixed(4)
+    );
+    const mutatedTargetWeight = parseFloat(
+      Math.min(100, updatedDistribution[targetDistKey] + shiftAmount).toFixed(4)
+    );
+    // Derive the third unaffected region's weight as the 100-sum remainder
+    // to guarantee the distribution always sums to exactly 100.
+    const thirdDistKey = (Object.keys(updatedDistribution) as Array<keyof typeof updatedDistribution>)
+      .find((k) => k !== sourceDistKey && k !== targetDistKey)!;
+    const derivedThirdWeight = parseFloat((100 - mutatedSourceWeight - mutatedTargetWeight).toFixed(4));
+    updatedDistribution[sourceDistKey] = mutatedSourceWeight;
+    updatedDistribution[targetDistKey] = mutatedTargetWeight;
+    updatedDistribution[thirdDistKey] = derivedThirdWeight;
 
     if (mongoConnected) {
       await db.collection<any>('load_balancer_state').updateOne(
