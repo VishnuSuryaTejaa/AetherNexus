@@ -31,6 +31,13 @@ const REGION_TO_KEY: Record<string, string> = {
   'AP-South': 'apSouthCluster',
 };
 
+// Domain 2 camelCase cluster identifier → server_health region name mapping
+const CLUSTER_ID_TO_REGION: Record<string, string> = {
+  usEastCluster: 'US-East',
+  euWestCluster: 'EU-West',
+  apSouthCluster: 'AP-South',
+};
+
 app.use(cors());
 app.use(express.json());
 
@@ -166,6 +173,87 @@ app.post('/api/mitigate', async (req: Request, res: Response) => {
     return res.status(502).json({
       success: false,
       message: `Failed to reach ${targetClusterRegion}: ${err.message}`,
+    });
+  }
+});
+
+/**
+ * POST /api/rebalance
+ * Domain 2 AI Core integration endpoint.
+ * Accepts { sourceRegion, targetRegion, trafficShiftPercentage } as dispatched
+ * by the executeLoadBalancing MCP tool and updates the in-memory routing weights
+ * persisted to MongoDB load_balancer_state.
+ */
+app.post('/api/rebalance', async (req: Request, res: Response) => {
+  const { sourceRegion, targetRegion, trafficShiftPercentage } = req.body || {};
+
+  if (!sourceRegion || !targetRegion || typeof trafficShiftPercentage !== 'number') {
+    return res.status(400).json({
+      success: false,
+      message: 'Missing or invalid payload. Required: sourceRegion (string), targetRegion (string), trafficShiftPercentage (number).',
+    });
+  }
+
+  const resolvedSourceRegion = CLUSTER_ID_TO_REGION[sourceRegion];
+  const resolvedTargetRegion = CLUSTER_ID_TO_REGION[targetRegion];
+
+  if (!resolvedSourceRegion || !resolvedTargetRegion) {
+    return res.status(400).json({
+      success: false,
+      message: `Unrecognized cluster identifier. Valid sourceRegion/targetRegion values: usEastCluster, euWestCluster, apSouthCluster. Received: sourceRegion=${sourceRegion}, targetRegion=${targetRegion}`,
+    });
+  }
+
+  if (trafficShiftPercentage < 1 || trafficShiftPercentage > 100) {
+    return res.status(400).json({
+      success: false,
+      message: `trafficShiftPercentage must be between 1 and 100. Received: ${trafficShiftPercentage}`,
+    });
+  }
+
+  try {
+    const currentDistribution = await getDistributionMap(db);
+
+    // Map server_health region names back to TrafficDistributionMap keys
+    const regionToDistKey: Record<string, keyof typeof currentDistribution> = {
+      'US-East': 'US-East-1',
+      'EU-West': 'EU-West-1',
+      'AP-South': 'AP-South-1',
+    };
+
+    const sourceDistKey = regionToDistKey[resolvedSourceRegion];
+    const targetDistKey = regionToDistKey[resolvedTargetRegion];
+
+    const updatedDistribution = { ...currentDistribution };
+    const shiftAmount = Math.min(trafficShiftPercentage, updatedDistribution[sourceDistKey]);
+    updatedDistribution[sourceDistKey] = Math.max(0, updatedDistribution[sourceDistKey] - shiftAmount);
+    updatedDistribution[targetDistKey] = Math.min(100, updatedDistribution[targetDistKey] + shiftAmount);
+
+    if (mongoConnected) {
+      await db.collection<any>('load_balancer_state').updateOne(
+        { _id: 'current_state' },
+        {
+          $set: {
+            traffic_distribution_map: updatedDistribution,
+            updatedAt: new Date(),
+          },
+        },
+        { upsert: true }
+      );
+    }
+
+    console.log(`[rebalance] Domain 2 directive applied — ${trafficShiftPercentage}% shifted from ${sourceRegion} to ${targetRegion}. New distribution:`, updatedDistribution);
+
+    return res.json({
+      success: true,
+      message: `Traffic rebalanced: ${trafficShiftPercentage}% shifted from ${sourceRegion} to ${targetRegion}.`,
+      traffic_distribution_map: updatedDistribution,
+    });
+  } catch (rebalanceOperationException: any) {
+    console.error('[rebalance] Failed to apply Domain 2 rebalance directive:', rebalanceOperationException.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal error applying rebalance directive.',
     });
   }
 });

@@ -17,9 +17,9 @@ export interface LoadBalancerState {
  */
 export function normalizeRegion(region: string): string {
   const r = region.trim().toUpperCase();
-  if (r === 'US-EAST' || r === 'US-EAST-1') return 'US-East';
-  if (r === 'EU-WEST' || r === 'EU-WEST-1') return 'EU-West';
-  if (r === 'AP-SOUTH' || r === 'AP-SOUTH-1') return 'AP-South';
+  if (r === 'US-EAST' || r === 'US-EAST-1' || r === 'USEASTCLUSTER') return 'US-East';
+  if (r === 'EU-WEST' || r === 'EU-WEST-1' || r === 'EUWESTCLUSTER') return 'EU-West';
+  if (r === 'AP-SOUTH' || r === 'AP-SOUTH-1' || r === 'APSOUTHCLUSTER') return 'AP-South';
   return region;
 }
 
