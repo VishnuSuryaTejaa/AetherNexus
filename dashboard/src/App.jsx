@@ -1,123 +1,265 @@
-import { useState, useEffect, useRef } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { OrbitControls, CameraShake, Environment, Stars } from '@react-three/drei';
+import { useRef, useMemo, useEffect, useState } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { OrbitControls, Html } from '@react-three/drei';
+import * as THREE from 'three';
 import { io } from 'socket.io-client';
 import ServerRack from './components/ServerRack';
+import Diagnostics from './components/Diagnostics';
+import './App.css';
 
-function App() {
-  const [status, setStatus] = useState('NOMINAL_GREEN');
+const packetGeo = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+const packetMat = new THREE.MeshBasicMaterial({ color: '#ffffff' });
+
+const gatewayGeo = new THREE.BoxGeometry(3, 0.5, 2);
+const rackMat = new THREE.MeshStandardMaterial({
+  color: '#2a2e39',
+  metalness: 0.8,
+  roughness: 0.2,
+  transparent: true,
+  opacity: 0.9,
+});
+
+function ApiGateway({ position }) {
+  return (
+    <group position={position}>
+      <mesh geometry={gatewayGeo} material={rackMat} />
+      <mesh>
+        <boxGeometry args={[3.1, 0.6, 2.1]} />
+        <meshBasicMaterial color="#00e5ff" wireframe transparent opacity={0.5} />
+      </mesh>
+      <Html center position={[0, 1, 0]}>
+        <div style={{ color: '#00e5ff', fontFamily: 'monospace', textShadow: `0 0 5px #00e5ff`, fontWeight: 'bold' }}>
+          API GATEWAY
+        </div>
+      </Html>
+    </group>
+  );
+}
+
+function DataFlowSystem({ apiGatewayPos, racks, statuses, trafficWeights }) {
+  const meshRef = useRef();
+  
+  const packets = useMemo(() => {
+    const arr = [];
+    racks.forEach((rack, rackIdx) => {
+      for (let i = 0; i < 150; i++) {
+        arr.push({
+          rackIdx,
+          progress: Math.random(),
+          speed: 0.2 + Math.random() * 0.3
+        });
+      }
+    });
+    return arr;
+  }, [racks]);
+
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+  const colorObj = useMemo(() => new THREE.Color(), []);
+
+  useFrame((state, delta) => {
+    if (!meshRef.current) return;
+    
+    const weights = [
+      trafficWeights?.usEastCluster || 0,
+      trafficWeights?.euWestCluster || 0,
+      trafficWeights?.apSouthCluster || 0
+    ];
+    const sum = weights.reduce((a, b) => a + b, 0);
+    const normalizedWeights = sum > 0 ? weights.map(w => w / sum) : [0, 0, 0];
+
+    packets.forEach((p, i) => {
+      p.progress += delta * p.speed;
+      if (p.progress > 1) {
+        p.progress = 0;
+        
+        if (sum > 0) {
+          const rand = Math.random();
+          let runningTotal = 0;
+          for (let idx = 0; idx < normalizedWeights.length; idx++) {
+            runningTotal += normalizedWeights[idx];
+            if (rand <= runningTotal) {
+              p.rackIdx = idx;
+              break;
+            }
+          }
+        }
+      }
+      
+      const targetRack = racks[p.rackIdx];
+      
+      dummy.position.lerpVectors(
+        new THREE.Vector3(...apiGatewayPos),
+        new THREE.Vector3(...targetRack.position),
+        p.progress
+      );
+      dummy.updateMatrix();
+      meshRef.current.setMatrixAt(i, dummy.matrix);
+      
+      const status = statuses[targetRack.id] || 'NOMINAL_GREEN';
+      if (status === 'CRITICAL_RED') colorObj.set('#ff3333');
+      else if (status === 'WARNING_AMBER') colorObj.set('#ffaa00');
+      else colorObj.set('#00ff00');
+      
+      meshRef.current.setColorAt(i, colorObj);
+    });
+    
+    meshRef.current.instanceMatrix.needsUpdate = true;
+    if (meshRef.current.instanceColor) meshRef.current.instanceColor.needsUpdate = true;
+  });
+
+  return (
+    <instancedMesh ref={meshRef} args={[packetGeo, packetMat, packets.length]}>
+      <instancedBufferAttribute attach="instanceColor" args={[new Float32Array(packets.length * 3), 3]} />
+    </instancedMesh>
+  );
+}
+
+export default function App() {
+  const [currentView, setCurrentView] = useState('topology');
   const [logs, setLogs] = useState([]);
-  const [isConnected, setIsConnected] = useState(false);
-  const logsEndRef = useRef(null);
+  const [trafficWeights, setTrafficWeights] = useState({ usEastCluster: 0.33, euWestCluster: 0.33, apSouthCluster: 0.34 });
+  const [statuses, setStatuses] = useState({
+    usEastCluster: 'NOMINAL_GREEN',
+    euWestCluster: 'NOMINAL_GREEN',
+    apSouthCluster: 'NOMINAL_GREEN'
+  });
+
+  const apiGatewayPos = useMemo(() => [0, 6, 0], []);
+  const racks = useMemo(() => [
+    { id: 'usEastCluster', position: [-6, -2, 0], label: 'US-EAST' },
+    { id: 'euWestCluster', position: [0, -2, 0], label: 'EU-WEST' },
+    { id: 'apSouthCluster', position: [6, -2, 0], label: 'AP-SOUTH' }
+  ], []);
 
   useEffect(() => {
-    // Scroll to bottom of logs when new ones arrive
-    logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [logs]);
-
-  useEffect(() => {
-    // Connect to the AI backend egress port
-    const socket = io('http://localhost:4000', {
-      reconnectionDelayMax: 10000,
-    });
-
-    socket.on('connect', () => {
-      console.log('Connected to AetherNexus Telemetry Stream');
-      setIsConnected(true);
-    });
-
-    socket.on('disconnect', () => {
-      console.log('Disconnected from Telemetry Stream');
-      setIsConnected(false);
-    });
+    const socket = io('http://localhost:4000', { reconnectionDelayMax: 10000 });
 
     socket.on('aethernexus-telemetry-broadcast', (data) => {
-      console.log('Received broadcast:', data);
+      setLogs(prev => [...prev, data].slice(-100));
       
-      // Update global status for 3D model
-      if (data.incidentThreatLevelColor) {
-        setStatus(data.incidentThreatLevelColor);
+      if (data.trafficDistribution) {
+        setTrafficWeights(data.trafficDistribution);
       }
 
-      // Add to terminal logs
-      setLogs(prev => [...prev, data].slice(-50)); // Keep last 50 logs
+      if (data.executedMitigationAction) {
+        let targetId = null;
+        if (data.executedMitigationAction.includes('usEastCluster')) targetId = 'usEastCluster';
+        if (data.executedMitigationAction.includes('euWestCluster')) targetId = 'euWestCluster';
+        if (data.executedMitigationAction.includes('apSouthCluster')) targetId = 'apSouthCluster';
+        
+        if (targetId && data.incidentThreatLevelColor) {
+          setStatuses(prev => ({
+            ...prev,
+            [targetId]: data.incidentThreatLevelColor
+          }));
+        }
+      }
     });
 
     return () => {
+      socket.off('aethernexus-telemetry-broadcast');
       socket.disconnect();
     };
   }, []);
 
-  const getStatusText = (colorCode) => {
-    switch(colorCode) {
-      case 'CRITICAL_RED': return 'CRITICAL';
-      case 'WARNING_AMBER': return 'WARNING';
-      case 'NOMINAL_GREEN': return 'STABLE';
-      default: return 'UNKNOWN';
-    }
+  const colorMap = {
+    NOMINAL_GREEN: '#00ff00',
+    WARNING_AMBER: '#ffaa00',
+    CRITICAL_RED: '#ff3333',
   };
 
   return (
-    <div className="dashboard-container">
-      
-      {/* 3D Scene */}
-      <Canvas camera={{ position: [0, 2, 8], fov: 50 }}>
-        <color attach="background" args={['#050505']} />
-        
-        <ambientLight intensity={0.2} />
-        <pointLight position={[10, 10, 10]} intensity={0.5} />
-        
-        <ServerRack status={status} />
-        
-        {/* Dynamic environment elements */}
-        <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={status === 'CRITICAL_RED' ? 3 : 1} />
-        <OrbitControls enablePan={false} maxPolarAngle={Math.PI / 2 + 0.1} />
-        
-        {status === 'CRITICAL_RED' && (
-          <CameraShake maxYaw={0.05} maxPitch={0.05} maxRoll={0.05} yawFrequency={0.5} pitchFrequency={0.5} rollFrequency={0.5} />
-        )}
-      </Canvas>
+    <div style={{ width: '100vw', height: '100vh', background: '#0a0a0a', overflow: 'hidden', position: 'relative' }}>
+      {currentView === 'diagnostics' ? (
+        <Diagnostics onReturn={() => setCurrentView('topology')} logs={logs} statuses={statuses} trafficWeights={trafficWeights} />
+      ) : (
+        <>
+          <Canvas camera={{ position: [0, 4, 15], fov: 50 }}>
+            <ambientLight intensity={0.5} />
+            <pointLight position={[0, 10, 0]} intensity={1.5} color="#ffffff" />
+            
+            <ApiGateway position={apiGatewayPos} />
+            
+            {racks.map(rack => (
+              <ServerRack 
+                key={rack.id} 
+                position={rack.position} 
+                label={rack.label} 
+                status={statuses[rack.id]} 
+              />
+            ))}
 
-      {/* UI Overlays */}
-      <div className={`status-indicator status-${status}`}>
-        <h1>SYSTEM STATUS</h1>
-        <p>{getStatusText(status)}</p>
-      </div>
+            <DataFlowSystem apiGatewayPos={apiGatewayPos} racks={racks} statuses={statuses} trafficWeights={trafficWeights} />
 
-      <div className="terminal-overlay">
-        <div className="terminal-header">
-          <span>AetherNexus Active Log</span>
-          <span>[LIVE FEED]</span>
-        </div>
-        <div className="terminal-content">
-          {logs.length === 0 ? (
-            <div style={{ color: '#666', fontStyle: 'italic' }}>Waiting for telemetry data...</div>
-          ) : (
-            logs.map((log, index) => (
-              <div key={index} className={`log-entry log-color-${log.incidentThreatLevelColor}`}>
-                <span className="log-timestamp">
-                  [{new Date(log.eventTimestamp).toLocaleTimeString()}]
-                </span>
-                <span className="log-architect">
-                  &lt;{log.principalArchitect}&gt;
-                </span>
-                <span className="log-action">
-                  {log.executedMitigationAction}
-                </span>
-              </div>
-            ))
-          )}
-          <div ref={logsEndRef} />
-        </div>
-      </div>
+            <OrbitControls enablePan={true} maxPolarAngle={Math.PI / 2} />
+          </Canvas>
 
-      <div className="connection-status">
-        <div className={`dot ${isConnected ? 'connected' : ''}`}></div>
-        {isConnected ? 'Uplink Established' : 'Attempting Connection...'}
-      </div>
+          {/* Glassmorphism Sidebar */}
+          <div style={{ 
+            position: 'absolute', 
+            top: 20, 
+            right: 20, 
+            width: 320, 
+            height: 'calc(100% - 40px)', 
+            background: 'rgba(20, 20, 25, 0.65)', 
+            backdropFilter: 'blur(12px)', 
+            border: '1px solid #00e5ff', 
+            borderRadius: 8, 
+            padding: 20, 
+            color: '#fff', 
+            fontFamily: 'monospace', 
+            overflowY: 'hidden', 
+            boxShadow: '0 0 20px rgba(0, 229, 255, 0.15)',
+            boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            <div style={{ position: 'absolute', top: 15, right: 15, fontSize: 11, color: '#00e5ff', opacity: 0.8 }}>
+              Session: Admin
+            </div>
+            <h3 style={{ borderBottom: '1px solid rgba(0, 229, 255, 0.3)', paddingBottom: 15, marginTop: 0, letterSpacing: '2px' }}>TELEMETRY LOGS</h3>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flexGrow: 1, overflowY: 'auto' }}>
+              {logs.map((log, i) => (
+                <div key={i} style={{ fontSize: 12, padding: '8px', background: 'rgba(0,0,0,0.3)', borderRadius: '4px', borderLeft: `3px solid ${colorMap[log.incidentThreatLevelColor] || '#00ff00'}` }}>
+                  <div style={{ color: colorMap[log.incidentThreatLevelColor] || '#00ff00', marginBottom: '4px', fontSize: '10px' }}>
+                    [{new Date(log.eventTimestamp).toLocaleTimeString()}] &lt;{log.principalArchitect}&gt;
+                  </div>
+                  <div style={{ color: '#e0e0e0', lineHeight: '1.4' }}>
+                    {log.executedMitigationAction}
+                  </div>
+                </div>
+              ))}
+              {logs.length === 0 && (
+                <div style={{ color: '#666', fontStyle: 'italic', marginTop: '20px', textAlign: 'center' }}>Awaiting telemetry streams...</div>
+              )}
+            </div>
 
+            <button 
+              onClick={() => setCurrentView('diagnostics')}
+              style={{ 
+                marginTop: '20px', 
+                width: '100%', 
+                padding: '12px', 
+                background: 'transparent', 
+                border: '1px solid #00e5ff', 
+                color: '#00e5ff', 
+                fontFamily: 'monospace', 
+                cursor: 'pointer',
+                borderRadius: '4px',
+                boxShadow: '0 0 10px rgba(0, 229, 255, 0.2)',
+                fontWeight: 'bold',
+                letterSpacing: '1px',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => { e.target.style.background = 'rgba(0, 229, 255, 0.1)'; e.target.style.boxShadow = '0 0 15px rgba(0, 229, 255, 0.4)'; }}
+              onMouseOut={(e) => { e.target.style.background = 'transparent'; e.target.style.boxShadow = '0 0 10px rgba(0, 229, 255, 0.2)'; }}
+            >
+              [ LAUNCH DIAGNOSTICS ]
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
-
-export default App;

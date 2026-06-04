@@ -28,7 +28,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const REGION = process.env.REGION || 'UNKNOWN';
 const MONGODB_URI = process.env.MONGODB_URI;
-const PUSH_INTERVAL_MS = 5000;
+const PUSH_INTERVAL_MS = 2000;
 
 // ── Middleware ───────────────────────────────────────────────────────────────
 app.use(cors());
@@ -62,6 +62,11 @@ function getCpuUsage() {
   if (totalTickDelta === 0) return 0;
 
   const realUsage = ((1 - totalIdleDelta / totalTickDelta) * 100);
+  
+  if (Math.random() < 0.35 && simulatedExtraLoad < 50) {
+    simulatedExtraLoad = 85 + Math.random() * 10;
+  }
+  
   return Math.min(100, Math.round((realUsage + simulatedExtraLoad) * 10) / 10);
 }
 

@@ -1,72 +1,129 @@
 import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Edges } from '@react-three/drei';
+import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 
-export default function ServerRack({ status }) {
-  const meshRef = useRef();
+const rackWidth = 1.5;
+const rackHeight = 5;
+const rackDepth = 1.5;
 
-  // Determine colors and behavior based on status
-  const colorMap = {
-    NOMINAL_GREEN: '#00ff00',
-    WARNING_AMBER: '#ffaa00',
-    CRITICAL_RED: '#ff3333',
-  };
+const frameGeo = new THREE.BoxGeometry(rackWidth, rackHeight, rackDepth);
+const frameMat = new THREE.MeshStandardMaterial({
+  color: '#1a1c23',
+  metalness: 0.9,
+  roughness: 0.3,
+});
 
-  const targetColor = colorMap[status] || colorMap.NOMINAL_GREEN;
-  const isCritical = status === 'CRITICAL_RED';
-  const isWarning = status === 'WARNING_AMBER';
+const ventGeo = new THREE.BoxGeometry(rackWidth + 0.02, rackHeight - 0.2, rackDepth - 0.2);
+const ventMat = new THREE.MeshBasicMaterial({
+  color: '#111111',
+  wireframe: true,
+  transparent: true,
+  opacity: 0.2
+});
 
-  const baseSpeed = isCritical ? 0.05 : isWarning ? 0.02 : 0.005;
+const numBlades = 12;
+const bladeHeight = (rackHeight - 0.4) / numBlades - 0.05;
+const bladeGeo = new THREE.BoxGeometry(rackWidth - 0.1, bladeHeight, rackDepth - 0.1);
+const bladeMat = new THREE.MeshStandardMaterial({
+  color: '#3a3e49',
+  metalness: 0.7,
+  roughness: 0.4,
+});
 
-  useFrame((state, delta) => {
-    if (meshRef.current) {
-      // Rotation
-      meshRef.current.rotation.y += baseSpeed;
+const ledsPerBlade = 4;
+const totalLEDs = numBlades * ledsPerBlade;
+const ledGeo = new THREE.BoxGeometry(0.05, 0.05, 0.02);
+const ledMat = new THREE.MeshBasicMaterial({ color: '#ffffff' });
 
-      // Color lerp for smooth transition
-      meshRef.current.material.emissive.lerp(new THREE.Color(targetColor), 0.1);
-      meshRef.current.material.color.lerp(new THREE.Color(targetColor), 0.1);
-      
-      // Jitter for critical status
-      if (isCritical) {
-        meshRef.current.position.x = (Math.random() - 0.5) * 0.1;
-        meshRef.current.position.z = (Math.random() - 0.5) * 0.1;
-      } else {
-        // Return to center smoothly
-        meshRef.current.position.lerp(new THREE.Vector3(0, 0, 0), 0.1);
+export default function ServerRack({ position, label, status }) {
+  const ledMeshRef = useRef();
+
+  const colorMap = useMemo(() => ({
+    NOMINAL_GREEN: { base: new THREE.Color('#00ff41'), dim: new THREE.Color('#003311') },
+    WARNING_AMBER: { base: new THREE.Color('#ffb000'), dim: new THREE.Color('#442200') },
+    CRITICAL_RED:  { base: new THREE.Color('#ff003c'), dim: new THREE.Color('#330000') },
+  }), []);
+
+  const currentColors = colorMap[status] || colorMap.NOMINAL_GREEN;
+  
+  const ledData = useMemo(() => {
+    const data = [];
+    const startY = -rackHeight / 2 + 0.2 + bladeHeight / 2;
+    for (let i = 0; i < numBlades; i++) {
+      const y = startY + i * (bladeHeight + 0.05);
+      for (let j = 0; j < ledsPerBlade; j++) {
+        const x = (rackWidth / 2) - 0.2 - (j * 0.1);
+        const z = rackDepth / 2 + 0.01;
+        const matrix = new THREE.Matrix4();
+        matrix.setPosition(x, y, z);
+        data.push({
+          matrix,
+          blinkOffset: Math.random() * Math.PI * 2,
+          blinkSpeed: 2 + Math.random() * 5
+        });
       }
+    }
+    return data;
+  }, []);
+
+  useFrame((state) => {
+    if (!ledMeshRef.current) return;
+    const time = state.clock.elapsedTime;
+    
+    const speedMultiplier = status === 'CRITICAL_RED' ? 4 : (status === 'WARNING_AMBER' ? 2 : 1);
+    const color = new THREE.Color();
+    
+    ledData.forEach((led, i) => {
+      ledMeshRef.current.setMatrixAt(i, led.matrix);
+      const blink = Math.sin(time * led.blinkSpeed * speedMultiplier + led.blinkOffset);
+      if (blink > 0) {
+        color.copy(currentColors.base);
+      } else {
+        color.copy(currentColors.dim);
+      }
+      ledMeshRef.current.setColorAt(i, color);
+    });
+    
+    ledMeshRef.current.instanceMatrix.needsUpdate = true;
+    if (ledMeshRef.current.instanceColor) {
+      ledMeshRef.current.instanceColor.needsUpdate = true;
     }
   });
 
   return (
-    <group>
-      <mesh ref={meshRef} position={[0, 0, 0]}>
-        <boxGeometry args={[2, 5, 2]} />
-        <meshStandardMaterial 
-          color="#00ff00"
-          emissive="#00ff00" 
-          emissiveIntensity={0.8}
-          transparent={true}
-          opacity={0.3}
-          wireframe={false}
-        />
-        <Edges
-          linewidth={2}
-          threshold={15}
-          color={targetColor}
-        />
-      </mesh>
+    <group position={position}>
+      <mesh geometry={frameGeo} material={frameMat} />
+      <mesh geometry={ventGeo} material={ventMat} />
       
-      {/* Glow rings around the server */}
-      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, -2, 0]}>
-        <ringGeometry args={[2.5, 2.6, 32]} />
-        <meshBasicMaterial color={targetColor} transparent opacity={0.5} />
-      </mesh>
-      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 2, 0]}>
-        <ringGeometry args={[2.5, 2.6, 32]} />
-        <meshBasicMaterial color={targetColor} transparent opacity={0.5} />
-      </mesh>
+      {Array.from({ length: numBlades }).map((_, i) => {
+        const y = -rackHeight / 2 + 0.2 + bladeHeight / 2 + i * (bladeHeight + 0.05);
+        return (
+          <mesh 
+            key={i} 
+            geometry={bladeGeo} 
+            material={bladeMat} 
+            position={[0, y, 0.02]} 
+          />
+        );
+      })}
+
+      <instancedMesh ref={ledMeshRef} args={[ledGeo, ledMat, totalLEDs]}>
+        <instancedBufferAttribute attach="instanceColor" args={[new Float32Array(totalLEDs * 3), 3]} />
+      </instancedMesh>
+      
+      <Html center position={[0, -3.2, 0]}>
+        <div style={{ 
+          color: currentColors.base.getStyle(), 
+          fontFamily: 'monospace', 
+          textShadow: `0 0 8px ${currentColors.base.getStyle()}`, 
+          fontWeight: 'bold', 
+          letterSpacing: '1px',
+          whiteSpace: 'nowrap'
+        }}>
+          {label}
+        </div>
+      </Html>
     </group>
   );
 }

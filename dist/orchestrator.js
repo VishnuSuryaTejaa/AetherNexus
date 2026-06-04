@@ -1,25 +1,38 @@
-import "dotenv/config";
+import * as dotenv from "dotenv"; dotenv.config({ override: true });
 import OpenAI from "openai";
 import { emitArchitecturalThoughtStreamPacket, bootstrapEgressBroadcastServer, } from "./egressBroadcaster.js";
-// ─── Environment Validation ────────────────────────────────────────────────────
-const resolvedOpenAiApiKey = process.env["OPENAI_API_KEY"];
+// ─── Environment Validation & Key Pool Initialization ──────────
 const resolvedOrchestratorModel = process.env["AETHERNEXUS_ORCHESTRATOR_MODEL"] ?? "gpt-4o";
-const resolvedDomain1IngressBaseUrl = process.env["DOMAIN1_TELEMETRY_INGRESS_BASE_URL"] ??
-    "http://localhost:3001";
-const resolvedPollingIntervalMs = parseInt(process.env["AETHERNEXUS_POLLING_INTERVAL_MS"] ?? "10000", 10);
-if (!resolvedOpenAiApiKey) {
-    console.error("[ORCHESTRATOR_ENV_VALIDATION_EXCEPTION] OPENAI_API_KEY is not defined in the runtime environment.");
+const resolvedDomain1IngressBaseUrl = process.env["DOMAIN1_TELEMETRY_INGRESS_BASE_URL"] ?? "http://localhost:3001";
+const resolvedPollingIntervalMs = parseInt(process.env["AETHERNEXUS_POLLING_INTERVAL_MS"] ?? "2000", 10);
+const resolvedLlmGatewayBaseUrl = process.env["OPENAI_BASE_URL"] ?? "https://api.groq.com/openai/v1";
+
+const groqKeyPool = [
+    process.env["OPENAI_API_KEY"],
+    process.env["OPENAI_API_KEY2"],
+    process.env["OPENAI_API_KEY3"]
+].filter((key) => key && key.startsWith("gsk_"));
+
+if (groqKeyPool.length === 0) {
+    console.error("[ORCHESTRATOR_ENV_VALIDATION_EXCEPTION] No valid OPENAI_API_KEYs (gsk_ pattern) found in the runtime environment.");
     process.exit(1);
 }
-// ─── LLM Client Initialization (Groq-compatible via OpenAI SDK baseURL hijack) ─
-const resolvedLlmGatewayBaseUrl = process.env["OPENAI_BASE_URL"] ?? "https://api.groq.com/openai/v1";
-if (!resolvedOpenAiApiKey.startsWith("gsk_")) {
-    console.error("[WARNING_CONFIG_MISMATCH] API key does not match Groq signature pattern.");
-}
-const aetherNexusLlmClient = new OpenAI({
-    apiKey: resolvedOpenAiApiKey,
+
+let currentKeyIndex = 0;
+
+let aetherNexusLlmClient = new OpenAI({
+    apiKey: groqKeyPool[currentKeyIndex],
     baseURL: resolvedLlmGatewayBaseUrl,
 });
+
+function rotateOpenAiKey() {
+    currentKeyIndex = (currentKeyIndex + 1) % groqKeyPool.length;
+    console.error(`[ORCHESTRATOR_KEY_ROTATION] TPM limit reached on active key. Rerouting neural pathways to backup key...`);
+    aetherNexusLlmClient = new OpenAI({
+        apiKey: groqKeyPool[currentKeyIndex],
+        baseURL: resolvedLlmGatewayBaseUrl,
+    });
+}
 // ─── SOP System Prompt (sourced from skills.md §3 & §4 + PROJECT_SPECS §1) ────
 const AUTONOMOUS_CONTROL_PLANE_SYSTEM_PROMPT = `
 You are the AetherNexus Autonomous AI Control Plane — a production-grade, self-healing multi-region infrastructure simulation engine.
@@ -38,7 +51,7 @@ You continuously evaluate live cluster telemetry ingested from the Domain 1 simu
 - You MUST call tools sequentially. Never parallelize destructive operations (cache flushes, override requests).
 - For CRITICAL_RED incidents: always call executeClusterCacheFlush BEFORE requestHumanOverrideClearance.
 - flushOperationAcknowledgementToken must be a newly generated UUIDv4 per incident.
-- requestingAgentIdentifier must always be "Surya-AI-Core".
+- requestingAgentIdentifier must always be "AetherNexus-Core".
 - incidentClassificationCode format: INC-[6 alphanumeric chars] — generate a unique code per incident.
 
 ### Variable Naming
@@ -48,10 +61,14 @@ You continuously evaluate live cluster telemetry ingested from the Domain 1 simu
 After each evaluation cycle, summarize your reasoning and any dispatched actions as a structured JSON object in your final message matching the egress broadcast schema:
 {
   "eventTimestamp": "<ISO8601>",
-  "principalArchitect": "Surya-AI-Core",
+  "principalArchitect": "AetherNexus-Core",
   "executedMitigationAction": "<description>",
-  "incidentThreatLevelColor": "<CRITICAL_RED | WARNING_AMBER | NOMINAL_GREEN>"
+  "incidentThreatLevelColor": "<CRITICAL_RED | WARNING_AMBER | NOMINAL_GREEN>",
+  "trafficDistribution": { "usEastCluster": 0.33, "euWestCluster": 0.33, "apSouthCluster": 0.34 }
 }
+
+### Routing Logic
+If a cluster is flagged as CRITICAL_RED, its traffic distribution MUST drop to 0.0. The remaining traffic must be divided equally among the healthy clusters. Once healed (NOMINAL_GREEN), the traffic must return to an even split.
 `.trim();
 // ─── MCP Tool Manifest (mirrors mcpServer.ts registrations exactly) ───────────
 const aetherNexusMcpToolManifest = [
@@ -169,27 +186,70 @@ const aetherNexusMcpToolManifest = [
             },
         },
     },
+    {
+        type: "function",
+        function: {
+            name: "executeLoadBalancing",
+            description: "Diverts traffic away from a failing cluster region.",
+            parameters: {
+                type: "object",
+                properties: {
+                    targetClusterRegion: {
+                        type: "string",
+                        enum: ["usEastCluster", "euWestCluster", "apSouthCluster"],
+                        description: "Target cluster region.",
+                    }
+                },
+                required: ["targetClusterRegion"],
+            },
+        },
+    },
 ];
-// ─── Domain 1 Ingress Mock (replaced by live HTTP in Milestone 2.3) ───────────
+let clusterMitigationCycles = {
+    usEastCluster: 0,
+    euWestCluster: 0,
+    apSouthCluster: 0,
+};
 async function simulateDomain1TelemetryIngress() {
-    // [MILESTONE 2.3] — Replace with live fetch from resolvedDomain1IngressBaseUrl.
-    // Mock simulates a CRITICAL euWest scenario to exercise the full SOP pipeline.
-    void resolvedDomain1IngressBaseUrl; // suppress unused-var until wired
+    try {
+        const res = await fetch(`${resolvedDomain1IngressBaseUrl}/api/infrastructure/telemetry`);
+        if (res.ok) {
+            const data = await res.json();
+            const snap = {};
+            for (const [r, k] of [['US-East-1', 'usEastCluster'], ['EU-West-1', 'euWestCluster'], ['AP-South-1', 'apSouthCluster']]) {
+                if (data.telemetry[r] && data.telemetry[r].length > 0) {
+                    snap[k] = data.telemetry[r][0];
+                } else {
+                    snap[k] = { computeLoadPercentage: 25, volatileMemoryAllocationGb: 4, clusterOperationalStatus: "STABLE" };
+                }
+            }
+            return snap;
+        }
+    } catch(e) {
+        console.error("Telemetry fetch failed", e);
+    }
+
+    Object.keys(clusterMitigationCycles).forEach(k => {
+        if (clusterMitigationCycles[k] > 0) clusterMitigationCycles[k]--;
+    });
+    
+    const isMitigated = (cluster) => clusterMitigationCycles[cluster] > 0;
+
     const regionalTelemetrySnapshot = {
         usEastCluster: {
-            computeLoadPercentage: 45.2,
+            computeLoadPercentage: isMitigated("usEastCluster") ? 45.2 : 45.2,
             volatileMemoryAllocationGb: 8.1,
-            clusterOperationalStatus: "STABLE",
+            clusterOperationalStatus: isMitigated("usEastCluster") ? "STABLE" : "STABLE",
         },
         euWestCluster: {
-            computeLoadPercentage: 92.0,
-            volatileMemoryAllocationGb: 14.5,
-            clusterOperationalStatus: "CRITICAL",
+            computeLoadPercentage: isMitigated("euWestCluster") ? 45.0 : 92.0,
+            volatileMemoryAllocationGb: isMitigated("euWestCluster") ? 7.5 : 14.5,
+            clusterOperationalStatus: isMitigated("euWestCluster") ? "STABLE" : "CRITICAL",
         },
         apSouthCluster: {
-            computeLoadPercentage: 12.1,
+            computeLoadPercentage: isMitigated("apSouthCluster") ? 12.1 : 12.1,
             volatileMemoryAllocationGb: 4.2,
-            clusterOperationalStatus: "STABLE",
+            clusterOperationalStatus: isMitigated("apSouthCluster") ? "STABLE" : "STABLE",
         },
     };
     return regionalTelemetrySnapshot;
@@ -225,13 +285,13 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
                     recentCommitRecords: [
                         {
                             commitSha: "a3f9c12",
-                            authorIdentity: "surya@aethernexus.io",
+                            authorIdentity: "aethernexus@aethernexus.io",
                             commitTimestamp: new Date(Date.now() - 1000 * 60 * 14).toISOString(),
                             commitMessageSummary: "perf(euWest): increase cache TTL for session-store namespace",
                         },
                         {
                             commitSha: "b7e2d45",
-                            authorIdentity: "surya@aethernexus.io",
+                            authorIdentity: "aethernexus@aethernexus.io",
                             commitTimestamp: new Date(Date.now() - 1000 * 60 * 47).toISOString(),
                             commitMessageSummary: "fix(euWest): patch volatile memory leak in ingress router",
                         },
@@ -242,7 +302,17 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
             }
             case "executeClusterCacheFlush": {
                 const cacheFlushDirective = JSON.parse(toolArgumentsJson);
+                if (clusterMitigationCycles[cacheFlushDirective.targetClusterRegion] !== undefined) {
+                    clusterMitigationCycles[cacheFlushDirective.targetClusterRegion] = 4;
+                }
                 // [LIVE] — Wire to Domain 1 cache invalidation endpoint in production.
+                try {
+                    await fetch(`${resolvedDomain1IngressBaseUrl}/api/mitigate`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(cacheFlushDirective)
+                    });
+                } catch(e) {}
                 const cacheFlushAcknowledgement = {
                     flushDispatchStatus: "ACKNOWLEDGED",
                     targetClusterRegion: cacheFlushDirective.targetClusterRegion,
@@ -253,7 +323,7 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
                 console.error(`[MCP_CACHE_FLUSH_DISPATCHED] Region: ${cacheFlushDirective.targetClusterRegion} | Namespace: ${cacheFlushDirective.cacheLayerNamespace}`);
                 const cacheFlushBroadcastPacket = {
                     eventTimestamp: new Date().toISOString(),
-                    principalArchitect: "Surya-AI-Core",
+                    principalArchitect: "AetherNexus-Core",
                     executedMitigationAction: `Cache flush dispatched on ${cacheFlushDirective.targetClusterRegion} — namespace: ${cacheFlushDirective.cacheLayerNamespace}`,
                     incidentThreatLevelColor: "CRITICAL_RED",
                 };
@@ -274,12 +344,32 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
                 console.error(`[MCP_HUMAN_OVERRIDE_REQUESTED] Incident: ${overrideClearanceRequest.incidentClassificationCode} | Risk: ${overrideClearanceRequest.autonomousDecisionRiskLevel}`);
                 const overrideClearanceBroadcastPacket = {
                     eventTimestamp: new Date().toISOString(),
-                    principalArchitect: "Surya-AI-Core",
+                    principalArchitect: "AetherNexus-Core",
                     executedMitigationAction: `Human override clearance requested — Incident: ${overrideClearanceRequest.incidentClassificationCode} | Risk: ${overrideClearanceRequest.autonomousDecisionRiskLevel}`,
                     incidentThreatLevelColor: "CRITICAL_RED",
                 };
                 emitArchitecturalThoughtStreamPacket(overrideClearanceBroadcastPacket);
                 return JSON.stringify(overrideClearanceAcknowledgement);
+            }
+            case "executeLoadBalancing": {
+                const loadBalanceDirective = JSON.parse(toolArgumentsJson);
+                if (clusterMitigationCycles[loadBalanceDirective.targetClusterRegion] !== undefined) {
+                    clusterMitigationCycles[loadBalanceDirective.targetClusterRegion] = 4;
+                }
+                const loadBalanceAcknowledgement = {
+                    dispatchStatus: "ACKNOWLEDGED",
+                    targetClusterRegion: loadBalanceDirective.targetClusterRegion,
+                    executionTimestamp: new Date().toISOString(),
+                };
+                console.error(`[MCP_LOAD_BALANCE_DISPATCHED] Region: ${loadBalanceDirective.targetClusterRegion}`);
+                const loadBalanceBroadcastPacket = {
+                    eventTimestamp: new Date().toISOString(),
+                    principalArchitect: "AetherNexus-Core",
+                    executedMitigationAction: `Load balancing executed on ${loadBalanceDirective.targetClusterRegion}`,
+                    incidentThreatLevelColor: "NOMINAL_GREEN",
+                };
+                emitArchitecturalThoughtStreamPacket(loadBalanceBroadcastPacket);
+                return JSON.stringify(loadBalanceAcknowledgement);
             }
             default: {
                 console.error(`[MCP_TOOL_DISPATCH_UNKNOWN_TOOL_EXCEPTION] Unrecognized tool name: ${dispatchedToolName}`);
@@ -301,44 +391,62 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
 // ─── Agentic Tool-Calling Loop ─────────────────────────────────────────────────
 async function executeAgenticReasoningCycle(activeConversationThread) {
     const mutatingConversationThread = [...activeConversationThread];
-    try {
-        while (true) {
-            const llmCompletionResponse = await aetherNexusLlmClient.chat.completions.create({
-                model: resolvedOrchestratorModel,
-                messages: mutatingConversationThread,
-                tools: aetherNexusMcpToolManifest,
-                tool_choice: "auto",
-            });
-            const primaryCompletionChoice = llmCompletionResponse.choices[0];
-            if (!primaryCompletionChoice) {
-                console.error("[ORCHESTRATOR_LLM_COMPLETION_EXCEPTION] LLM returned zero completion choices. Aborting reasoning cycle.");
-                break;
-            }
-            const assistantReasoningMessage = primaryCompletionChoice.message;
-            mutatingConversationThread.push(assistantReasoningMessage);
-            if (primaryCompletionChoice.finish_reason === "stop") {
-                break;
-            }
-            if (primaryCompletionChoice.finish_reason === "tool_calls" &&
-                assistantReasoningMessage.tool_calls) {
-                for (const pendingToolInvocation of assistantReasoningMessage.tool_calls) {
-                    if (pendingToolInvocation.type === "function") {
-                        console.error(`[ORCHESTRATOR_TOOL_DISPATCH] Invoking: ${pendingToolInvocation.function.name} | Args: ${pendingToolInvocation.function.arguments}`);
-                    }
-                    const toolExecutionOutputJson = await dispatchMcpToolCall(pendingToolInvocation);
-                    mutatingConversationThread.push({
-                        role: "tool",
-                        tool_call_id: pendingToolInvocation.id,
-                        content: toolExecutionOutputJson,
-                    });
+    let retryCount = 0;
+    const MAX_RETRIES = groqKeyPool.length;
+
+    while (retryCount <= MAX_RETRIES) {
+        try {
+            while (true) {
+                const llmCompletionResponse = await aetherNexusLlmClient.chat.completions.create({
+                    model: resolvedOrchestratorModel,
+                    messages: mutatingConversationThread,
+                    tools: aetherNexusMcpToolManifest,
+                    tool_choice: "auto",
+                });
+                const primaryCompletionChoice = llmCompletionResponse.choices[0];
+                if (!primaryCompletionChoice) {
+                    console.error("[ORCHESTRATOR_LLM_COMPLETION_EXCEPTION] LLM returned zero completion choices. Aborting reasoning cycle.");
+                    break;
                 }
-                continue;
+                const assistantReasoningMessage = primaryCompletionChoice.message;
+                mutatingConversationThread.push(assistantReasoningMessage);
+                if (primaryCompletionChoice.finish_reason === "stop") {
+                    break;
+                }
+                if (primaryCompletionChoice.finish_reason === "tool_calls" &&
+                    assistantReasoningMessage.tool_calls) {
+                    for (const pendingToolInvocation of assistantReasoningMessage.tool_calls) {
+                        if (pendingToolInvocation.type === "function") {
+                            console.error(`[ORCHESTRATOR_TOOL_DISPATCH] Invoking: ${pendingToolInvocation.function.name} | Args: ${pendingToolInvocation.function.arguments}`);
+                        }
+                        const toolExecutionOutputJson = await dispatchMcpToolCall(pendingToolInvocation);
+                        mutatingConversationThread.push({
+                            role: "tool",
+                            tool_call_id: pendingToolInvocation.id,
+                            content: toolExecutionOutputJson,
+                        });
+                    }
+                    continue;
+                }
+                break;
             }
-            break;
+            return mutatingConversationThread; // Success
         }
-    }
-    catch (agenticCycleExecutionException) {
-        console.error("[ORCHESTRATOR_AGENTIC_CYCLE_EXCEPTION]", agenticCycleExecutionException);
+        catch (agenticCycleExecutionException) {
+            if (agenticCycleExecutionException?.status === 429 || agenticCycleExecutionException?.code === "rate_limit_exceeded") {
+                retryCount++;
+                if (retryCount < MAX_RETRIES) {
+                    rotateOpenAiKey();
+                    continue; // Retry with the new key
+                } else {
+                    console.error("[ORCHESTRATOR_AGENTIC_CYCLE_EXCEPTION] All keys exhausted via 429 RateLimitError.", agenticCycleExecutionException);
+                    break;
+                }
+            } else {
+                console.error("[ORCHESTRATOR_AGENTIC_CYCLE_EXCEPTION]", agenticCycleExecutionException);
+                break;
+            }
+        }
     }
     return mutatingConversationThread;
 }
@@ -370,17 +478,39 @@ export async function infrastructureEvaluationLoop() {
                 console.error(`[ORCHESTRATOR_CYCLE_COMPLETE] AI Evaluation Summary:\n${terminalLlmOutputText}`);
                 // ── Parse LLM-structured egress packet and broadcast to Domain 3 ─────
                 try {
-                    const jsonExtractionMatch = terminalLlmOutputText.match(/\{[\s\S]*?"incidentThreatLevelColor"[\s\S]*?\}/);
-                    if (jsonExtractionMatch?.[0]) {
-                        const parsedLlmEgressDirective = JSON.parse(jsonExtractionMatch[0]);
+                    const firstBrace = terminalLlmOutputText.indexOf('{');
+                    const lastBrace = terminalLlmOutputText.lastIndexOf('}');
+                    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace >= firstBrace) {
+                        let cleanJsonString = terminalLlmOutputText.substring(firstBrace, lastBrace + 1);
+                        cleanJsonString = cleanJsonString.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+                        let parsedLlmEgressDirective = JSON.parse(cleanJsonString);
+
+                        const isAllStable = Object.values(currentTelemetrySnapshot).every(c => c.clusterOperationalStatus === "STABLE");
+                        if (isAllStable) {
+                            parsedLlmEgressDirective.incidentThreatLevelColor = "NOMINAL_GREEN";
+                            parsedLlmEgressDirective.trafficDistribution = {
+                                usEastCluster: 0.33,
+                                euWestCluster: 0.33,
+                                apSouthCluster: 0.34
+                            };
+                            try {
+                                await fetch(`${resolvedDomain1IngressBaseUrl}/api/chaos/reset`, { method: "POST" });
+                            } catch(e) {}
+                        }
+
                         const architecturalThoughtStreamPacket = {
                             eventTimestamp: parsedLlmEgressDirective.eventTimestamp ??
                                 new Date().toISOString(),
-                            principalArchitect: parsedLlmEgressDirective.principalArchitect ?? "Surya-AI-Core",
+                            principalArchitect: parsedLlmEgressDirective.principalArchitect ?? "AetherNexus-Core",
                             executedMitigationAction: parsedLlmEgressDirective.executedMitigationAction ??
                                 "Autonomous evaluation cycle completed — no critical action required.",
                             incidentThreatLevelColor: parsedLlmEgressDirective.incidentThreatLevelColor ??
                                 "NOMINAL_GREEN",
+                            trafficDistribution: parsedLlmEgressDirective.trafficDistribution ?? {
+                                usEastCluster: 0.33,
+                                euWestCluster: 0.33,
+                                apSouthCluster: 0.34
+                            }
                         };
                         emitArchitecturalThoughtStreamPacket(architecturalThoughtStreamPacket);
                     }
@@ -388,15 +518,28 @@ export async function infrastructureEvaluationLoop() {
                         // LLM did not embed a structured JSON block — emit a NOMINAL fallback.
                         const nominalCycleBroadcastPacket = {
                             eventTimestamp: new Date().toISOString(),
-                            principalArchitect: "Surya-AI-Core",
+                            principalArchitect: "AetherNexus-Core",
                             executedMitigationAction: "Evaluation cycle completed — infrastructure nominal.",
                             incidentThreatLevelColor: "NOMINAL_GREEN",
+                            trafficDistribution: {
+                                usEastCluster: 0.33,
+                                euWestCluster: 0.33,
+                                apSouthCluster: 0.34
+                            }
                         };
                         emitArchitecturalThoughtStreamPacket(nominalCycleBroadcastPacket);
                     }
                 }
                 catch (egressPacketParseException) {
                     console.error("[SOCKET_EGRESS_PACKET_PARSE_EXCEPTION]", egressPacketParseException);
+                    const nominalCycleBroadcastPacket = {
+                        eventTimestamp: new Date().toISOString(),
+                        principalArchitect: "AetherNexus-Core",
+                        executedMitigationAction: "Evaluation cycle completed — fallback to nominal.",
+                        incidentThreatLevelColor: "NOMINAL_GREEN",
+                        trafficDistribution: { usEastCluster: 0.33, euWestCluster: 0.33, apSouthCluster: 0.34 }
+                    };
+                    emitArchitecturalThoughtStreamPacket(nominalCycleBroadcastPacket);
                 }
             }
         }
