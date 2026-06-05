@@ -98,6 +98,7 @@ function DataFlowSystem({ apiGatewayPos, racks, statuses, trafficWeights }) {
       const status = statuses[targetRack.id] || 'NOMINAL_GREEN';
       if (status === 'CRITICAL_RED') colorObj.set('#ff3333');
       else if (status === 'WARNING_AMBER') colorObj.set('#ffaa00');
+      else if (status === 'HEALING') colorObj.set('#ffd700');
       else colorObj.set('#00ff00');
       
       meshRef.current.setColorAt(i, colorObj);
@@ -123,6 +124,7 @@ export default function App() {
     euWestCluster: 'NOMINAL_GREEN',
     apSouthCluster: 'NOMINAL_GREEN'
   });
+  const [healingProgresses, setHealingProgresses] = useState({});
 
   const apiGatewayPos = useMemo(() => [0, 6, 0], []);
   const racks = useMemo(() => [
@@ -152,6 +154,12 @@ export default function App() {
             ...prev,
             [targetId]: data.incidentThreatLevelColor
           }));
+          if (data.healingProgress !== undefined) {
+            setHealingProgresses(prev => ({
+              ...prev,
+              [targetId]: data.healingProgress
+            }));
+          }
         }
       }
     });
@@ -166,6 +174,7 @@ export default function App() {
     NOMINAL_GREEN: '#00ff00',
     WARNING_AMBER: '#ffaa00',
     CRITICAL_RED: '#ff3333',
+    HEALING: '#ffd700',
   };
 
   return (
@@ -185,7 +194,8 @@ export default function App() {
                 key={rack.id} 
                 position={rack.position} 
                 label={rack.label} 
-                status={statuses[rack.id]} 
+                status={statuses[rack.id]}
+                healingProgress={healingProgresses[rack.id]}
               />
             ))}
 

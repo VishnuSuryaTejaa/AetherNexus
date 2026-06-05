@@ -9,6 +9,12 @@ import {
   normalizeRegion,
   TrafficDistributionMap
 } from './loadbalancer';
+import { 
+  injectFault, 
+  mitigateCluster, 
+  pollClustersAndWriteToDb,
+  Region 
+} from './clusterManager';
 
 // Load environment variables
 dotenv.config();
@@ -60,6 +66,11 @@ async function connectDb() {
     
     // Initialize the routing table on startup
     await recalculateRouting(db);
+    
+    // Initialize genuine hardware telemetry loop
+    setInterval(() => {
+      pollClustersAndWriteToDb(db).catch(console.error);
+    }, 2000);
   } catch (err: any) {
     console.error('[server] MongoDB connection failed:', err.message);
     process.exit(1);
@@ -151,28 +162,24 @@ app.post('/api/mitigate', async (req: Request, res: Response) => {
     });
   }
 
-  const nodeUrl = NODE_URLS[targetClusterRegion];
-  if (!nodeUrl) {
-    return res.status(400).json({
-      success: false,
-      message: `Unknown region: ${targetClusterRegion}. Valid: usEastCluster, euWestCluster, apSouthCluster`,
-    });
-  }
-
   try {
-    const response = await fetch(`${nodeUrl}/api/flush-cache`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cacheLayerNamespace }),
+    // Execute mitigation: clear memory arrays, stop math loops, restore network
+    mitigateCluster(targetClusterRegion as Region);
+    
+    if (mongoConnected) {
+      await recalculateRouting(db);
+    }
+
+    console.log(`[mitigate] Autonomous mitigation executed on ${targetClusterRegion}: ${cacheLayerNamespace}`);
+    return res.json({
+      success: true,
+      message: `Mitigation successful on ${targetClusterRegion}.`,
     });
-    const result = await response.json();
-    console.log(`[mitigate] Sent flush-cache to ${targetClusterRegion}: ${cacheLayerNamespace}`);
-    return res.json(result);
   } catch (err: any) {
-    console.error(`[mitigate] Failed to reach ${targetClusterRegion}:`, err.message);
-    return res.status(502).json({
+    console.error(`[mitigate] Failed to mitigate ${targetClusterRegion}:`, err.message);
+    return res.status(500).json({
       success: false,
-      message: `Failed to reach ${targetClusterRegion}: ${err.message}`,
+      message: `Internal error during mitigation: ${err.message}`,
     });
   }
 });
@@ -271,6 +278,33 @@ app.post('/api/rebalance', async (req: Request, res: Response) => {
 });
 
 // ── Chaos Endpoints ─────────────────────────────────────────────────────────
+
+/**
+ * POST /api/chaos/inject-fault
+ * Executes programmatic resource fault-injection on isolated cluster workers.
+ */
+app.post('/api/chaos/inject-fault', async (req: Request, res: Response) => {
+  const { targetClusterRegion, faultType } = req.body;
+  if (!targetClusterRegion || !faultType) {
+    return res.status(400).json({ error: 'Missing targetClusterRegion or faultType' });
+  }
+
+  try {
+    injectFault(targetClusterRegion as Region, faultType as any);
+    if (mongoConnected && faultType === 'NETWORK_DROPOUT') {
+      await recalculateRouting(db);
+    }
+
+    console.log(`[chaos] Fault ${faultType} injected into ${targetClusterRegion}`);
+    return res.json({
+      success: true,
+      message: `Successfully injected ${faultType} into ${targetClusterRegion}`,
+    });
+  } catch (err: any) {
+    console.error('[chaos] Inject fault error:', err.message);
+    return res.status(500).json({ error: 'Failed to inject fault' });
+  }
+});
 
 /**
  * POST /api/chaos/spike-cpu

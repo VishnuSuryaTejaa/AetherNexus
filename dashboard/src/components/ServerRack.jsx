@@ -36,13 +36,14 @@ const totalLEDs = numBlades * ledsPerBlade;
 const ledGeo = new THREE.BoxGeometry(0.05, 0.05, 0.02);
 const ledMat = new THREE.MeshBasicMaterial({ color: '#ffffff' });
 
-export default function ServerRack({ position, label, status }) {
+export default function ServerRack({ position, label, status, healingProgress }) {
   const ledMeshRef = useRef();
 
   const colorMap = useMemo(() => ({
     NOMINAL_GREEN: { base: new THREE.Color('#00ff41'), dim: new THREE.Color('#003311') },
     WARNING_AMBER: { base: new THREE.Color('#ffb000'), dim: new THREE.Color('#442200') },
     CRITICAL_RED:  { base: new THREE.Color('#ff003c'), dim: new THREE.Color('#330000') },
+    HEALING:       { base: new THREE.Color('#ffd700'), dim: new THREE.Color('#554400') },
   }), []);
 
   const currentColors = colorMap[status] || colorMap.NOMINAL_GREEN;
@@ -71,7 +72,7 @@ export default function ServerRack({ position, label, status }) {
     if (!ledMeshRef.current) return;
     const time = state.clock.elapsedTime;
     
-    const speedMultiplier = status === 'CRITICAL_RED' ? 4 : (status === 'WARNING_AMBER' ? 2 : 1);
+    const speedMultiplier = status === 'CRITICAL_RED' ? 4 : (status === 'WARNING_AMBER' ? 2 : (status === 'HEALING' ? 3 : 1));
     const color = new THREE.Color();
     
     ledData.forEach((led, i) => {
@@ -119,9 +120,16 @@ export default function ServerRack({ position, label, status }) {
           textShadow: `0 0 8px ${currentColors.base.getStyle()}`, 
           fontWeight: 'bold', 
           letterSpacing: '1px',
-          whiteSpace: 'nowrap'
+          whiteSpace: 'nowrap',
+          textAlign: 'center'
         }}>
-          {label}
+          <div>{label}</div>
+          {healingProgress !== undefined && healingProgress !== null && (
+            <div style={{ marginTop: '5px', width: '100px', height: '10px', border: `1px solid ${currentColors.base.getStyle()}`, background: 'rgba(0,0,0,0.5)' }}>
+              <div style={{ width: `${healingProgress}%`, height: '100%', background: currentColors.base.getStyle(), transition: 'width 0.3s ease' }} />
+              <div style={{ fontSize: '10px', marginTop: '2px', color: '#fff' }}>Healing: {healingProgress}%</div>
+            </div>
+          )}
         </div>
       </Html>
     </group>

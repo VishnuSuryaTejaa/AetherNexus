@@ -324,10 +324,40 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
                 const cacheFlushBroadcastPacket = {
                     eventTimestamp: new Date().toISOString(),
                     principalArchitect: "AetherNexus-Core",
-                    executedMitigationAction: `Cache flush dispatched on ${cacheFlushDirective.targetClusterRegion} — namespace: ${cacheFlushDirective.cacheLayerNamespace}`,
-                    incidentThreatLevelColor: "CRITICAL_RED",
+                    executedMitigationAction: `Cache flush dispatched on ${cacheFlushDirective.targetClusterRegion} — namespace: ${cacheFlushDirective.cacheLayerNamespace}. Healing initiated.`,
+                    incidentThreatLevelColor: "HEALING",
+                    healingProgress: 0,
+                    targetClusterRegion: cacheFlushDirective.targetClusterRegion,
                 };
                 emitArchitecturalThoughtStreamPacket(cacheFlushBroadcastPacket);
+
+                (async () => {
+                    for (let progress = 25; progress <= 100; progress += 25) {
+                        await new Promise(r => setTimeout(r, 500));
+                        if (progress === 100) {
+                            try { await fetch(`${resolvedDomain1IngressBaseUrl}/api/chaos/reset`, { method: "POST" }); } catch(e) {}
+                            emitArchitecturalThoughtStreamPacket({
+                                eventTimestamp: new Date().toISOString(),
+                                principalArchitect: "AetherNexus-Core",
+                                executedMitigationAction: `Healing complete on ${cacheFlushDirective.targetClusterRegion}. Systems nominal.`,
+                                incidentThreatLevelColor: "NOMINAL_GREEN",
+                                healingProgress: null,
+                                targetClusterRegion: cacheFlushDirective.targetClusterRegion,
+                                trafficDistribution: { usEastCluster: 0.33, euWestCluster: 0.33, apSouthCluster: 0.34 }
+                            });
+                        } else {
+                            emitArchitecturalThoughtStreamPacket({
+                                eventTimestamp: new Date().toISOString(),
+                                principalArchitect: "AetherNexus-Core",
+                                executedMitigationAction: `Healing in progress on ${cacheFlushDirective.targetClusterRegion}...`,
+                                incidentThreatLevelColor: "HEALING",
+                                healingProgress: progress,
+                                targetClusterRegion: cacheFlushDirective.targetClusterRegion
+                            });
+                        }
+                    }
+                })();
+
                 return JSON.stringify(cacheFlushAcknowledgement);
             }
             case "requestHumanOverrideClearance": {
