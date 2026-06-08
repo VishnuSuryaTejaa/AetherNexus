@@ -39,7 +39,40 @@ const CLUSTER_ID_TO_REGION: Record<string, string> = {
   euWestCluster: 'EU-West',
   apSouthCluster: 'AP-South',
 };
+// ── DISTRIBUTED NETWORK BRIDGES ──────────────────────────────────────────
+// These functions replace the old local clusterManager. 
+// They convert internal gateway commands into physical HTTP network requests sent across the globe.
 
+async function mitigateCluster(region: Region) {
+  const targetUrl = MICROSERVICE_URLS[region];
+  console.log(`[Gateway] Routing mitigation command across the internet to ${targetUrl}`);
+  try {
+    await fetch(`${targetUrl}/mitigate`, { method: 'POST' });
+  } catch (err) {
+    console.error(`[Gateway] Failed to reach ${region} at ${targetUrl}`);
+  }
+}
+
+async function injectFault(region: Region, faultType: string) {
+  const targetUrl = MICROSERVICE_URLS[region];
+  console.log(`[Gateway] Routing chaos command across the internet to ${targetUrl}`);
+  try {
+    await fetch(`${targetUrl}/inject-fault`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targetClusterRegion: region, faultType })
+    });
+  } catch (err) {
+    console.error(`[Gateway] Failed to reach ${region} at ${targetUrl}`);
+  }
+}
+
+async function pollClustersAndWriteToDb(database: Db) {
+  // Legacy bypass: In our true cloud model, the remote nodes write their own telemetry to MongoDB directly.
+  // This empty bridge satisfies the TypeScript compiler without causing double-writing.
+  return Promise.resolve();
+}
+// ─────────────────────────────────────────────────────────────────────────
 app.use(cors());
 app.use(express.json());
 
