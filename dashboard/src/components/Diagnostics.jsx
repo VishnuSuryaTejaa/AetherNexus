@@ -10,7 +10,7 @@ export default function Diagnostics({ onReturn, logs, statuses, trafficWeights }
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://localhost:3001/api/infrastructure/telemetry')
+    fetch(`${import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:4000'}/api/infrastructure/telemetry`)
       .then(res => res.json())
       .then(data => {
         setTelemetry(data);

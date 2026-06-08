@@ -5,7 +5,10 @@ import * as THREE from 'three';
 import { io } from 'socket.io-client';
 import ServerRack from './components/ServerRack';
 import Diagnostics from './components/Diagnostics';
+import DevOpsControls from './components/DevOpsControls';
 import './App.css';
+
+const GATEWAY_URL = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:4000';
 
 const packetGeo = new THREE.BoxGeometry(0.1, 0.1, 0.1);
 const packetMat = new THREE.MeshBasicMaterial({ color: '#ffffff' });
@@ -134,7 +137,7 @@ export default function App() {
   ], []);
 
   useEffect(() => {
-    const socket = io('http://localhost:4000', { reconnectionDelayMax: 10000 });
+    const socket = io(GATEWAY_URL, { reconnectionDelayMax: 10000 });
 
     socket.on('aethernexus-telemetry-broadcast', (data) => {
       setLogs(prev => [...prev, data].slice(-100));
