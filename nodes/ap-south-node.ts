@@ -7,7 +7,7 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
-const PORT = 3003;
+const PORT = process.env.PORT || 3003;
 const REGION_ID = 'apSouthCluster';
 const REGION_DB_NAME = 'AP-South';
 const MONGODB_URI = process.env.MONGODB_URI;

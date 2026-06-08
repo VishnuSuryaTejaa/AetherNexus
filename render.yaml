@@ -1,0 +1,63 @@
+services:
+
+  # ─── API Gateway (Domain 1 Orchestration Layer) ──────────────────────────────
+  - type: web
+    name: aethernexus-gateway
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm install
+    startCommand: npx ts-node server.ts
+    envVars:
+      - key: MONGODB_URI
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: US_EAST_URL
+        sync: false   # Set to Render URL of us-east-cluster after deploy
+      - key: EU_WEST_URL
+        sync: false   # Set to Render URL of eu-west-cluster after deploy
+      - key: AP_SOUTH_URL
+        sync: false   # Set to Render URL of ap-south-cluster after deploy
+
+  # ─── US-East Cluster Microservice ────────────────────────────────────────────
+  - type: web
+    name: us-east-cluster
+    env: node
+    region: ohio
+    plan: free
+    buildCommand: npm install
+    startCommand: npx ts-node nodes/us-east-node.ts
+    envVars:
+      - key: MONGODB_URI
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+
+  # ─── EU-West Cluster Microservice ────────────────────────────────────────────
+  - type: web
+    name: eu-west-cluster
+    env: node
+    region: frankfurt
+    plan: free
+    buildCommand: npm install
+    startCommand: npx ts-node nodes/eu-west-node.ts
+    envVars:
+      - key: MONGODB_URI
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+
+  # ─── AP-South Cluster Microservice ───────────────────────────────────────────
+  - type: web
+    name: ap-south-cluster
+    env: node
+    region: singapore
+    plan: free
+    buildCommand: npm install
+    startCommand: npx ts-node nodes/ap-south-node.ts
+    envVars:
+      - key: MONGODB_URI
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false

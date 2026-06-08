@@ -4,6 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "start": "node app.js",
+    "mcp": "node mcp_server.js",
+    "chaos-server": "ts-node server.ts",
+    "gateway": "ts-node gateway.ts",
     "start:all": "concurrently \"npx ts-node server.ts\" \"node dist/orchestrator.js\" \"npx ts-node nodes/us-east-node.ts\" \"npx ts-node nodes/eu-west-node.ts\" \"npx ts-node nodes/ap-south-node.ts\" \"cd dashboard && npm run dev\""
   },
   "keywords": [],
@@ -28,7 +32,7 @@
     "@types/http-proxy-middleware": "^0.19.3",
     "@types/node": "^25.9.1",
     "@types/node-fetch": "^2.6.13",
-    "concurrently": "^10.0.3",
+    "concurrently": "^9.1.2",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.3"
   }

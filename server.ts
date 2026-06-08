@@ -9,25 +9,21 @@ import {
   normalizeRegion,
   TrafficDistributionMap
 } from './loadbalancer';
-import { 
-  injectFault, 
-  mitigateCluster, 
-  pollClustersAndWriteToDb,
-  Region 
-} from './clusterManager';
+// Local region type — microservices run as separate processes
+type Region = 'usEastCluster' | 'euWestCluster' | 'apSouthCluster';
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
-const PORT = process.env.LOCAL_PORT || process.env.PORT || 3001;
+const PORT = process.env.PORT || 4000;
 const MONGODB_URI = process.env.MONGODB_URI;
 
-// Deployed health node URLs
-const NODE_URLS: Record<string, string> = {
-  usEastCluster: process.env.NODE_US_URL || 'https://oweyr-health-node-us-east.hf.space',
-  euWestCluster: process.env.NODE_EU_URL || 'https://oweyr-health-node-eu-west.hf.space',
-  apSouthCluster: process.env.NODE_ASIA_URL || 'https://oweyr-health-node-ap-south.hf.space',
+// Microservice URLs — driven by environment variables for production (Render)
+const MICROSERVICE_URLS: Record<string, string> = {
+  usEastCluster: process.env.US_EAST_URL || 'http://localhost:3001',
+  euWestCluster: process.env.EU_WEST_URL || 'http://localhost:3002',
+  apSouthCluster: process.env.AP_SOUTH_URL || 'http://localhost:3003',
 };
 
 // Region name → JSON key mapping (for real data)
