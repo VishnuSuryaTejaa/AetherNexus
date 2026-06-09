@@ -569,10 +569,11 @@ export async function infrastructureEvaluationLoop() {
     }, resolvedPollingIntervalMs);
 }
 // ─── Entrypoint Guard ──────────────────────────────────────────────────────────
-bootstrapEgressBroadcastServer()
-    .then(() => infrastructureEvaluationLoop())
-    .catch((fatalBootstrapException) => {
-    console.error("[ORCHESTRATOR_FATAL_BOOTSTRAP_EXCEPTION]", fatalBootstrapException);
-    process.exit(1);
-});
+export function bootOrchestrator() {
+    // If running in the same process as server.ts, we skip the standalone socket bootstrap
+    // to avoid EADDRINUSE port conflicts since server.ts already runs the socket server.
+    infrastructureEvaluationLoop().catch((fatalBootstrapException) => {
+        console.error("[ORCHESTRATOR_FATAL_BOOTSTRAP_EXCEPTION]", fatalBootstrapException);
+    });
+}
 //# sourceMappingURL=orchestrator.js.map

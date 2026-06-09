@@ -11,6 +11,7 @@ import {
   normalizeRegion,
   TrafficDistributionMap
 } from './loadbalancer';
+import { bootOrchestrator } from './dist/orchestrator.js';
 // Local region type — microservices run as separate processes
 type Region = 'usEastCluster' | 'euWestCluster' | 'apSouthCluster';
 
@@ -102,6 +103,10 @@ async function connectDb() {
     db = client.db();
     mongoConnected = true;
     console.log('[server] Connected to MongoDB Atlas successfully.');
+    
+    // Boot the AI evaluation engine inside the main process
+    bootOrchestrator();
+    console.log('[server] AI Orchestrator engine initialized and running.');
     
     // Initialize the routing table on startup
     await recalculateRouting(db);
