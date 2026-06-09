@@ -1,6 +1,20 @@
 import * as dotenv from "dotenv"; dotenv.config({ override: true });
 import OpenAI from "openai";
+import fs from "fs";
+import path from "path";
 import { emitArchitecturalThoughtStreamPacket, bootstrapEgressBroadcastServer, writeAiLog, getLiveTelemetry } from "./egressBroadcaster.js";
+
+function loadSystemContext() {
+    let contextDocs = "";
+    const files = ["skills.md", "mcp.md", "instructions.md"];
+    for (const file of files) {
+        const filePath = path.join(process.cwd(), file);
+        if (fs.existsSync(filePath)) {
+            contextDocs += `\n\n--- ${file} ---\n` + fs.readFileSync(filePath, "utf-8");
+        }
+    }
+    return contextDocs;
+}
 // ─── Environment Validation & Key Pool Initialization ──────────
 const resolvedOrchestratorModel = process.env["AETHERNEXUS_ORCHESTRATOR_MODEL"] ?? "gpt-4o";
 const resolvedDomain1IngressBaseUrl = process.env["DOMAIN1_TELEMETRY_INGRESS_BASE_URL"] ?? "http://localhost:3001";
@@ -474,10 +488,27 @@ async function executeEvaluationCycle() {
                 role: "user",
                 content: `Evaluate the following live infrastructure telemetry snapshot and execute the appropriate SOP actions:\n\n${JSON.stringify({ infrastructureState: currentTelemetrySnapshot }, null, 2)}`,
             };
+
+            const dynamicContextDocs = loadSystemContext();
+            const liveEndpoints = `
+Live Endpoints:
+Gateway: ${process.env.AETHERNEXUS_GATEWAY_URL || "https://aethernexus-gateway.onrender.com"}
+US-East: ${process.env.US_EAST_URL || "https://aethernexus-us-east.onrender.com"}
+EU-West: ${process.env.EU_WEST_URL || "https://aethernexus-eu-west.onrender.com"}
+AP-South: ${process.env.AP_SOUTH_URL || "https://aethernexus-ap-south.onrender.com"}`;
+
+            const dynamicSystemPrompt = `You are the AetherNexus Autonomous Orchestrator. Your exact capabilities are defined in the injected MCP and Skills documentation below. You must ONLY use the tools explicitly defined. You will receive live MongoDB telemetry. If CPU > 90% or Status is CRITICAL, you MUST execute a mitigation tool.
+
+${liveEndpoints}
+
+${dynamicContextDocs}
+
+${AUTONOMOUS_CONTROL_PLANE_SYSTEM_PROMPT}`;
+
             const initialConversationThread = [
                 {
                     role: "system",
-                    content: AUTONOMOUS_CONTROL_PLANE_SYSTEM_PROMPT,
+                    content: dynamicSystemPrompt,
                 },
                 telemetryContextMessage,
             ];
