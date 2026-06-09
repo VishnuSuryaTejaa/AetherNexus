@@ -375,6 +375,12 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
     }
     catch (mcpToolDispatchException) {
         console.error(`[MCP_TOOL_DISPATCH_EXECUTION_EXCEPTION] Tool: ${dispatchedToolName}`, mcpToolDispatchException);
+        writeAiLog({
+            text: `[AI] ERROR: Tool ${dispatchedToolName} failed - ${mcpToolDispatchException instanceof Error ? mcpToolDispatchException.message : 'Unknown error'}`,
+            level: 'critical',
+            timestamp: new Date().toISOString(),
+            architect: 'AetherNexus-Core'
+        });
         return JSON.stringify({
             dispatchFailureReason: mcpToolDispatchException instanceof Error
                 ? mcpToolDispatchException.message
@@ -403,6 +409,7 @@ async function executeAgenticReasoningCycle(activeConversationThread) {
                     break;
                 }
                 const assistantReasoningMessage = primaryCompletionChoice.message;
+                console.error('[DIAGNOSTIC - LLM RAW RESPONSE]:', JSON.stringify(assistantReasoningMessage, null, 2));
                 mutatingConversationThread.push(assistantReasoningMessage);
                 if (primaryCompletionChoice.finish_reason === "stop") {
                     break;
@@ -460,6 +467,10 @@ export async function infrastructureEvaluationLoop() {
         writeAiLog({ text: '[AI] Evaluation cycle started — ingesting live telemetry snapshot.', level: 'info', timestamp: new Date().toISOString(), architect: 'AetherNexus-Core' });
         try {
             const currentTelemetrySnapshot = await simulateDomain1TelemetryIngress();
+            console.error('[DIAGNOSTIC - RAW DB DATA]:', JSON.stringify(currentTelemetrySnapshot, null, 2));
+            if (!currentTelemetrySnapshot || Object.keys(currentTelemetrySnapshot).length === 0) {
+                writeAiLog({ text: '[AI] ERROR: Database returned empty telemetry snapshot.', level: 'critical', timestamp: new Date().toISOString(), architect: 'AetherNexus-Core' });
+            }
             const telemetryContextMessage = {
                 role: "user",
                 content: `Evaluate the following live infrastructure telemetry snapshot and execute the appropriate SOP actions:\n\n${JSON.stringify({ infrastructureState: currentTelemetrySnapshot }, null, 2)}`,
