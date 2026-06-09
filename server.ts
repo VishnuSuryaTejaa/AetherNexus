@@ -11,8 +11,7 @@ import {
   normalizeRegion,
   TrafficDistributionMap
 } from './loadbalancer';
-// AI Logger bridge — forwards orchestrator insight events to connected frontend clients
-import { aiLogger } from './dist/egressBroadcaster.js';
+import { aiLogger } from './aiLogger';
 // Local region type — microservices run as separate processes
 type Region = 'usEastCluster' | 'euWestCluster' | 'apSouthCluster';
 

@@ -1,9 +1,6 @@
 import { createServer as createHttpServer } from "http";
 import { Server as SocketIoServer } from "socket.io";
-import { EventEmitter } from "events";
-
-// ─── AI Logger EventEmitter (consumed by server.ts bridge) ────────────────────
-export const aiLogger = new EventEmitter();
+import { aiLogger } from "../aiLogger.js";
 // ─── Socket.io Server Initialization ──────────────────────────────────────────
 const resolvedEgressSocketPort = parseInt(process.env["AETHERNEXUS_SOCKET_EGRESS_PORT"] ?? "4000", 10);
 const aetherNexusHttpTransportServer = createHttpServer();
