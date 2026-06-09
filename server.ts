@@ -11,6 +11,7 @@ import {
   normalizeRegion,
   TrafficDistributionMap
 } from './loadbalancer';
+// @ts-ignore - Bypassing TS strict mode for compiled JS module
 import { bootOrchestrator } from './dist/orchestrator.js';
 // Local region type — microservices run as separate processes
 type Region = 'usEastCluster' | 'euWestCluster' | 'apSouthCluster';
@@ -103,6 +104,7 @@ async function connectDb() {
     db = client.db();
     mongoConnected = true;
     console.log('[server] Connected to MongoDB Atlas successfully.');
+    bootOrchestrator();
     
     // Boot the AI evaluation engine inside the main process
     bootOrchestrator();

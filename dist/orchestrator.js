@@ -569,11 +569,10 @@ export async function infrastructureEvaluationLoop() {
     }, resolvedPollingIntervalMs);
 }
 // ─── Entrypoint Guard ──────────────────────────────────────────────────────────
+// Add this right below the executeEvaluationCycle function block
 export function bootOrchestrator() {
-    // If running in the same process as server.ts, we skip the standalone socket bootstrap
-    // to avoid EADDRINUSE port conflicts since server.ts already runs the socket server.
-    infrastructureEvaluationLoop().catch((fatalBootstrapException) => {
-        console.error("[ORCHESTRATOR_FATAL_BOOTSTRAP_EXCEPTION]", fatalBootstrapException);
-    });
+    console.error("[ORCHESTRATOR_BOOTSTRAP] Engine ignition. AI evaluation loop starting...");
+    executeEvaluationCycle(); // Run immediately on boot
+    setInterval(executeEvaluationCycle, 15000); // Run every 15 seconds
 }
 //# sourceMappingURL=orchestrator.js.map
