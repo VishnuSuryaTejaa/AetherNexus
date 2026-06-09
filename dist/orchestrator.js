@@ -18,7 +18,7 @@ function loadSystemContext() {
 // ─── Environment Validation & Key Pool Initialization ──────────
 const resolvedOrchestratorModel = process.env["AETHERNEXUS_ORCHESTRATOR_MODEL"] ?? "gpt-4o";
 const resolvedDomain1IngressBaseUrl = process.env["DOMAIN1_TELEMETRY_INGRESS_BASE_URL"] ?? "http://localhost:3001";
-const resolvedPollingIntervalMs = parseInt(process.env["AETHERNEXUS_POLLING_INTERVAL_MS"] ?? "2000", 10);
+const resolvedPollingIntervalMs = parseInt(process.env["AETHERNEXUS_POLLING_INTERVAL_MS"] ?? "15000", 10);
 const resolvedLlmGatewayBaseUrl = process.env["OPENAI_BASE_URL"] ?? "https://api.groq.com/openai/v1";
 
 const groqKeyPool = [
@@ -597,6 +597,6 @@ ${AUTONOMOUS_CONTROL_PLANE_SYSTEM_PROMPT}`;
 export function bootOrchestrator() {
     console.error("[ORCHESTRATOR_BOOTSTRAP] Engine ignition. AI evaluation loop starting...");
     executeEvaluationCycle(); // Run immediately on boot
-    setInterval(executeEvaluationCycle, 15000); // Run every 15 seconds
+    setInterval(executeEvaluationCycle, resolvedPollingIntervalMs); // Run every 15 seconds
 }
 //# sourceMappingURL=orchestrator.js.map
