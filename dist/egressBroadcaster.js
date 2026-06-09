@@ -26,6 +26,42 @@ export async function writeAiLog(payload) {
         console.error("[writeAiLog] Error inserting AI log:", e);
     }
 }
+
+export async function getLiveTelemetry() {
+    if (!db) return null;
+    try {
+        const pipeline = [
+            { $sort: { timestamp: -1 } },
+            {
+                $group: {
+                    _id: '$region',
+                    computeLoadPercentage: { $first: '$computeLoadPercentage' },
+                    volatileMemoryAllocationGb: { $first: '$volatileMemoryAllocationGb' },
+                    clusterOperationalStatus: { $first: '$clusterOperationalStatus' },
+                },
+            },
+        ];
+        const results = await db.collection('server_health').aggregate(pipeline).toArray();
+        const infrastructureState = {
+            usEastCluster: { computeLoadPercentage: 0, volatileMemoryAllocationGb: 0, clusterOperationalStatus: 'STABLE' },
+            euWestCluster: { computeLoadPercentage: 0, volatileMemoryAllocationGb: 0, clusterOperationalStatus: 'STABLE' },
+            apSouthCluster: { computeLoadPercentage: 0, volatileMemoryAllocationGb: 0, clusterOperationalStatus: 'STABLE' },
+        };
+        results.forEach((r) => {
+            if (infrastructureState[r._id]) {
+                infrastructureState[r._id] = {
+                    computeLoadPercentage: r.computeLoadPercentage,
+                    volatileMemoryAllocationGb: r.volatileMemoryAllocationGb,
+                    clusterOperationalStatus: r.clusterOperationalStatus,
+                };
+            }
+        });
+        return infrastructureState;
+    } catch (e) {
+        console.error("[getLiveTelemetry] MongoDB error:", e);
+        return null;
+    }
+}
 // ─── Socket.io Server Initialization ──────────────────────────────────────────
 const resolvedEgressSocketPort = parseInt(process.env["AETHERNEXUS_SOCKET_EGRESS_PORT"] ?? "4000", 10);
 const aetherNexusHttpTransportServer = createHttpServer();

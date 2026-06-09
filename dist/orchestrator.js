@@ -1,6 +1,6 @@
 import * as dotenv from "dotenv"; dotenv.config({ override: true });
 import OpenAI from "openai";
-import { emitArchitecturalThoughtStreamPacket, bootstrapEgressBroadcastServer, writeAiLog } from "./egressBroadcaster.js";
+import { emitArchitecturalThoughtStreamPacket, bootstrapEgressBroadcastServer, writeAiLog, getLiveTelemetry } from "./egressBroadcaster.js";
 // ─── Environment Validation & Key Pool Initialization ──────────
 const resolvedOrchestratorModel = process.env["AETHERNEXUS_ORCHESTRATOR_MODEL"] ?? "gpt-4o";
 const resolvedDomain1IngressBaseUrl = process.env["DOMAIN1_TELEMETRY_INGRESS_BASE_URL"] ?? "http://localhost:3001";
@@ -205,54 +205,18 @@ const aetherNexusMcpToolManifest = [
         },
     },
 ];
-let clusterMitigationCycles = {
-    usEastCluster: 0,
-    euWestCluster: 0,
-    apSouthCluster: 0,
-};
 async function simulateDomain1TelemetryIngress() {
     try {
-        const res = await fetch(`${resolvedDomain1IngressBaseUrl}/api/infrastructure/telemetry`);
-        if (res.ok) {
-            const data = await res.json();
-            const snap = {};
-            for (const [r, k] of [['US-East-1', 'usEastCluster'], ['EU-West-1', 'euWestCluster'], ['AP-South-1', 'apSouthCluster']]) {
-                if (data.telemetry[r] && data.telemetry[r].length > 0) {
-                    snap[k] = data.telemetry[r][0];
-                } else {
-                    snap[k] = { computeLoadPercentage: 25, volatileMemoryAllocationGb: 4, clusterOperationalStatus: "STABLE" };
-                }
-            }
-            return snap;
-        }
+        const liveData = await getLiveTelemetry();
+        if (liveData) return liveData;
     } catch(e) {
-        console.error("Telemetry fetch failed", e);
+        console.error("Telemetry fetch from MongoDB failed", e);
     }
-
-    Object.keys(clusterMitigationCycles).forEach(k => {
-        if (clusterMitigationCycles[k] > 0) clusterMitigationCycles[k]--;
-    });
-    
-    const isMitigated = (cluster) => clusterMitigationCycles[cluster] > 0;
-
-    const regionalTelemetrySnapshot = {
-        usEastCluster: {
-            computeLoadPercentage: isMitigated("usEastCluster") ? 45.2 : 45.2,
-            volatileMemoryAllocationGb: 8.1,
-            clusterOperationalStatus: isMitigated("usEastCluster") ? "STABLE" : "STABLE",
-        },
-        euWestCluster: {
-            computeLoadPercentage: isMitigated("euWestCluster") ? 45.0 : 92.0,
-            volatileMemoryAllocationGb: isMitigated("euWestCluster") ? 7.5 : 14.5,
-            clusterOperationalStatus: isMitigated("euWestCluster") ? "STABLE" : "CRITICAL",
-        },
-        apSouthCluster: {
-            computeLoadPercentage: isMitigated("apSouthCluster") ? 12.1 : 12.1,
-            volatileMemoryAllocationGb: 4.2,
-            clusterOperationalStatus: isMitigated("apSouthCluster") ? "STABLE" : "STABLE",
-        },
+    return {
+        usEastCluster: { computeLoadPercentage: 25, volatileMemoryAllocationGb: 4, clusterOperationalStatus: "STABLE" },
+        euWestCluster: { computeLoadPercentage: 25, volatileMemoryAllocationGb: 4, clusterOperationalStatus: "STABLE" },
+        apSouthCluster: { computeLoadPercentage: 25, volatileMemoryAllocationGb: 4, clusterOperationalStatus: "STABLE" },
     };
-    return regionalTelemetrySnapshot;
 }
 // ─── MCP Tool Execution Dispatcher ────────────────────────────────────────────
 async function dispatchMcpToolCall(toolInvocationRequest) {
