@@ -129,6 +129,7 @@ export default function App() {
     apSouthCluster: 'NOMINAL_GREEN'
   });
   const [healingProgresses, setHealingProgresses] = useState({});
+  const [liveMetrics, setLiveMetrics] = useState({});
 
   const apiGatewayPos = useMemo(() => [0, 6, 0], []);
   const racks = useMemo(() => [
@@ -168,11 +169,57 @@ export default function App() {
       }
     });
 
+    socket.on('live-metrics-stream', (data) => {
+      setLiveMetrics(data);
+
+      Object.entries(data).forEach(([regionId, metrics]) => {
+        const m = metrics as any;
+        const cpu = m?.computeLoadPercentage ?? 0;
+        const dbStatus = m?.clusterOperationalStatus;
+        if (dbStatus === 'HEALING') {
+          setStatuses(prev => ({ ...prev, [regionId]: 'HEALING' }));
+        } else if (cpu > 90) {
+          setStatuses(prev => ({ ...prev, [regionId]: 'CRITICAL_RED' }));
+        } else if (cpu > 75) {
+          setStatuses(prev => ({ ...prev, [regionId]: 'WARNING_AMBER' }));
+        }
+
+        const logEntry = `[${new Date().toLocaleTimeString()}] ${regionId.toUpperCase()} | CPU: ${cpu.toFixed(1)}% | RAM: ${m?.volatileMemoryAllocationGb?.toFixed(1)}GB | Status: ${dbStatus}`;
+        setLogs(prev => [logEntry, ...prev].slice(0, 50));
+      });
+    });
+
     return () => {
       socket.off('aethernexus-telemetry-broadcast');
+      socket.off('live-metrics-stream');
       socket.disconnect();
     };
   }, []);
+
+  const handleManualMitigate = async (region) => {
+    setStatuses(prev => ({ ...prev, [region]: 'HEALING' }));
+    setHealingProgresses(prev => ({ ...prev, [region]: 0 }));
+    let progress = 0;
+    const interval = setInterval(() => {
+      progress += 1;
+      if (progress >= 100) {
+        clearInterval(interval);
+        setStatuses(prev => ({ ...prev, [region]: 'NOMINAL_GREEN' }));
+        setHealingProgresses(prev => ({ ...prev, [region]: null }));
+      } else {
+        setHealingProgresses(prev => ({ ...prev, [region]: progress }));
+      }
+    }, 300);
+    try {
+      await fetch(`${GATEWAY_URL}/api/mitigate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetClusterRegion: region, cacheLayerNamespace: 'manual-ui-override' })
+      });
+    } catch (e) {
+      console.error('Manual mitigation failed', e);
+    }
+  };
 
   const colorMap = {
     NOMINAL_GREEN: '#00ff00',
@@ -200,6 +247,7 @@ export default function App() {
                 label={rack.label} 
                 status={statuses[rack.id]}
                 healingProgress={healingProgresses[rack.id]}
+                metrics={liveMetrics[rack.id]}
               />
             ))}
 
@@ -234,16 +282,26 @@ export default function App() {
             <h3 style={{ borderBottom: '1px solid rgba(0, 229, 255, 0.3)', paddingBottom: 15, marginTop: 0, letterSpacing: '2px' }}>TELEMETRY LOGS</h3>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flexGrow: 1, overflowY: 'auto' }}>
-              {logs.map((log, i) => (
-                <div key={i} style={{ fontSize: 12, padding: '8px', background: 'rgba(0,0,0,0.3)', borderRadius: '4px', borderLeft: `3px solid ${colorMap[log.incidentThreatLevelColor] || '#00ff00'}` }}>
-                  <div style={{ color: colorMap[log.incidentThreatLevelColor] || '#00ff00', marginBottom: '4px', fontSize: '10px' }}>
-                    [{new Date(log.eventTimestamp).toLocaleTimeString()}] &lt;{log.principalArchitect}&gt;
+              {logs.map((log, i) => {
+                const isString = typeof log === 'string';
+                const borderColor = isString ? '#00ff41' : (colorMap[log.incidentThreatLevelColor] || '#00ff00');
+                return (
+                  <div key={i} style={{ fontSize: 12, padding: '8px', background: 'rgba(0,0,0,0.3)', borderRadius: '4px', borderLeft: `3px solid ${borderColor}` }}>
+                    {isString ? (
+                      <div style={{ color: '#00ff41', lineHeight: '1.4', fontFamily: 'monospace' }}>{log}</div>
+                    ) : (
+                      <>
+                        <div style={{ color: colorMap[log.incidentThreatLevelColor] || '#00ff00', marginBottom: '4px', fontSize: '10px' }}>
+                          [{new Date(log.eventTimestamp).toLocaleTimeString()}] &lt;{log.principalArchitect}&gt;
+                        </div>
+                        <div style={{ color: '#e0e0e0', lineHeight: '1.4' }}>
+                          {log.executedMitigationAction}
+                        </div>
+                      </>
+                    )}
                   </div>
-                  <div style={{ color: '#e0e0e0', lineHeight: '1.4' }}>
-                    {log.executedMitigationAction}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               {logs.length === 0 && (
                 <div style={{ color: '#666', fontStyle: 'italic', marginTop: '20px', textAlign: 'center' }}>Awaiting telemetry streams...</div>
               )}
@@ -273,6 +331,9 @@ export default function App() {
             </button>
           </div>
         </>
+      )}
+      {currentView !== 'diagnostics' && (
+        <DevOpsControls onMitigate={handleManualMitigate} />
       )}
     </div>
   );
