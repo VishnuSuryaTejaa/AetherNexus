@@ -173,7 +173,7 @@ export default function App() {
       setLiveMetrics(data);
 
       Object.entries(data).forEach(([regionId, metrics]) => {
-        const m = metrics as any;
+        const m = metrics;
         const cpu = m?.computeLoadPercentage ?? 0;
         const dbStatus = m?.clusterOperationalStatus;
         if (dbStatus === 'HEALING') {
