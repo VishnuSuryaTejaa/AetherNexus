@@ -1,5 +1,7 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
+import http from 'http';
+import { Server as SocketIOServer } from 'socket.io';
 import { MongoClient, Db } from 'mongodb';
 import dotenv from 'dotenv';
 import fetch from 'node-fetch';
@@ -16,6 +18,10 @@ type Region = 'usEastCluster' | 'euWestCluster' | 'apSouthCluster';
 dotenv.config();
 
 const app = express();
+const httpServer = http.createServer(app);
+const io = new SocketIOServer(httpServer, {
+  cors: { origin: '*', methods: ['GET', 'POST'] },
+});
 const PORT = process.env.PORT || 4000;
 const MONGODB_URI = process.env.MONGODB_URI;
 
@@ -73,7 +79,11 @@ async function pollClustersAndWriteToDb(database: Db) {
   return Promise.resolve();
 }
 // ─────────────────────────────────────────────────────────────────────────
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
 app.use(express.json());
 
 let db: Db;
@@ -96,9 +106,14 @@ async function connectDb() {
     // Initialize the routing table on startup
     await recalculateRouting(db);
     
-    // Initialize genuine hardware telemetry loop
-    setInterval(() => {
-      pollClustersAndWriteToDb(db).catch(console.error);
+    // High-frequency telemetry broadcast loop
+    setInterval(async () => {
+      try {
+        const liveData = await getLatestMetrics();
+        if (liveData) io.emit('live-metrics-stream', liveData);
+      } catch (err: any) {
+        console.error('[Socket] Broadcast error:', err.message);
+      }
     }, 2000);
   } catch (err: any) {
     console.error('[server] MongoDB connection failed:', err.message);
@@ -524,7 +539,7 @@ app.get('/api/infrastructure/telemetry', async (req: Request, res: Response) => 
 // Start the Server
 async function start() {
   await connectDb();
-  app.listen(PORT, () => {
+  httpServer.listen(PORT, () => {
     console.log(`[chaos-server] Unified Admin & Telemetry server running on port ${PORT}`);
   });
 }
