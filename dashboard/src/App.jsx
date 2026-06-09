@@ -189,9 +189,15 @@ export default function App() {
       });
     });
 
+    // AI Orchestrator real-time insight stream
+    socket.on('ai-log', (payload) => {
+      setLogs(prev => [{ __aiLog: true, ...payload }, ...prev].slice(0, 50));
+    });
+
     return () => {
       socket.off('aethernexus-telemetry-broadcast');
       socket.off('live-metrics-stream');
+      socket.off('ai-log');
       socket.disconnect();
     };
   }, []);
@@ -283,11 +289,22 @@ export default function App() {
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flexGrow: 1, overflowY: 'auto' }}>
               {logs.map((log, i) => {
+                const AI_LEVEL_COLORS = { info: '#00e5ff', warning: '#ffaa00', critical: '#ff3333', success: '#00ff41' };
+                const isAiLog = log?.__aiLog === true;
                 const isString = typeof log === 'string';
-                const borderColor = isString ? '#00ff41' : (colorMap[log.incidentThreatLevelColor] || '#00ff00');
+                const borderColor = isAiLog ? (AI_LEVEL_COLORS[log.level] || '#00e5ff')
+                  : isString ? '#00ff41'
+                  : (colorMap[log.incidentThreatLevelColor] || '#00ff00');
                 return (
                   <div key={i} style={{ fontSize: 12, padding: '8px', background: 'rgba(0,0,0,0.3)', borderRadius: '4px', borderLeft: `3px solid ${borderColor}` }}>
-                    {isString ? (
+                    {isAiLog ? (
+                      <>
+                        <div style={{ color: AI_LEVEL_COLORS[log.level] || '#00e5ff', marginBottom: '3px', fontSize: '10px', fontFamily: 'monospace' }}>
+                          [{new Date(log.timestamp).toLocaleTimeString()}] &lt;{log.architect}&gt; [{log.level?.toUpperCase()}]
+                        </div>
+                        <div style={{ color: '#e0e0e0', lineHeight: '1.4' }}>{log.text}</div>
+                      </>
+                    ) : isString ? (
                       <div style={{ color: '#00ff41', lineHeight: '1.4', fontFamily: 'monospace' }}>{log}</div>
                     ) : (
                       <>

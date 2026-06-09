@@ -11,6 +11,8 @@ import {
   normalizeRegion,
   TrafficDistributionMap
 } from './loadbalancer';
+// AI Logger bridge — forwards orchestrator insight events to connected frontend clients
+import { aiLogger } from './dist/egressBroadcaster.js';
 // Local region type — microservices run as separate processes
 type Region = 'usEastCluster' | 'euWestCluster' | 'apSouthCluster';
 
@@ -115,6 +117,12 @@ async function connectDb() {
         console.error('[Socket] Broadcast error:', err.message);
       }
     }, 2000);
+
+    // AI Insight Bridge: forward orchestrator EventEmitter events to frontend WebSocket clients
+    aiLogger.on('insight', (payload: { text: string; level: string; timestamp: string; architect: string }) => {
+      io.emit('ai-log', payload);
+      console.log(`[AI_BRIDGE] Forwarded ai-log: [${payload.level.toUpperCase()}] ${payload.text}`);
+    });
   } catch (err: any) {
     console.error('[server] MongoDB connection failed:', err.message);
     process.exit(1);

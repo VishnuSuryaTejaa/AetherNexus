@@ -1,5 +1,9 @@
 import { createServer as createHttpServer } from "http";
 import { Server as SocketIoServer } from "socket.io";
+import { EventEmitter } from "events";
+
+// ─── AI Logger EventEmitter (consumed by server.ts bridge) ────────────────────
+export const aiLogger = new EventEmitter();
 // ─── Socket.io Server Initialization ──────────────────────────────────────────
 const resolvedEgressSocketPort = parseInt(process.env["AETHERNEXUS_SOCKET_EGRESS_PORT"] ?? "4000", 10);
 const aetherNexusHttpTransportServer = createHttpServer();
@@ -22,6 +26,18 @@ export function emitArchitecturalThoughtStreamPacket(architecturalThoughtStreamP
     try {
         aetherNexusSocketIoEgressServer.emit("aethernexus-telemetry-broadcast", architecturalThoughtStreamPacket);
         console.error(`[SOCKET_BROADCAST_EMITTED] Event: aethernexus-telemetry-broadcast | ThreatLevel: ${architecturalThoughtStreamPacket.incidentThreatLevelColor} | Action: ${architecturalThoughtStreamPacket.executedMitigationAction}`);
+
+        // Emit tagged AI insight to the bridge listener in server.ts
+        const level = architecturalThoughtStreamPacket.incidentThreatLevelColor === 'CRITICAL_RED' ? 'critical'
+            : architecturalThoughtStreamPacket.incidentThreatLevelColor === 'WARNING_AMBER' ? 'warning'
+            : architecturalThoughtStreamPacket.incidentThreatLevelColor === 'NOMINAL_GREEN' ? 'success'
+            : 'info';
+        aiLogger.emit('insight', {
+            text: `[AI] ${architecturalThoughtStreamPacket.executedMitigationAction}`,
+            level,
+            timestamp: architecturalThoughtStreamPacket.eventTimestamp ?? new Date().toISOString(),
+            architect: architecturalThoughtStreamPacket.principalArchitect ?? 'AetherNexus-Core',
+        });
     }
     catch (socketBroadcastException) {
         console.error("[SOCKET_BROADCAST_EXCEPTION]", socketBroadcastException);

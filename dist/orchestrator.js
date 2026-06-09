@@ -1,6 +1,6 @@
 import * as dotenv from "dotenv"; dotenv.config({ override: true });
 import OpenAI from "openai";
-import { emitArchitecturalThoughtStreamPacket, bootstrapEgressBroadcastServer, } from "./egressBroadcaster.js";
+import { emitArchitecturalThoughtStreamPacket, bootstrapEgressBroadcastServer, aiLogger } from "./egressBroadcaster.js";
 // ─── Environment Validation & Key Pool Initialization ──────────
 const resolvedOrchestratorModel = process.env["AETHERNEXUS_ORCHESTRATOR_MODEL"] ?? "gpt-4o";
 const resolvedDomain1IngressBaseUrl = process.env["DOMAIN1_TELEMETRY_INGRESS_BASE_URL"] ?? "http://localhost:3001";
@@ -448,6 +448,14 @@ async function executeAgenticReasoningCycle(activeConversationThread) {
                     for (const pendingToolInvocation of assistantReasoningMessage.tool_calls) {
                         if (pendingToolInvocation.type === "function") {
                             console.error(`[ORCHESTRATOR_TOOL_DISPATCH] Invoking: ${pendingToolInvocation.function.name} | Args: ${pendingToolInvocation.function.arguments}`);
+                            aiLogger.emit('insight', {
+                                text: `[AI TOOL] Invoking ${pendingToolInvocation.function.name}`,
+                                level: pendingToolInvocation.function.name === 'executeClusterCacheFlush' ? 'warning'
+                                     : pendingToolInvocation.function.name === 'requestHumanOverrideClearance' ? 'critical'
+                                     : 'info',
+                                timestamp: new Date().toISOString(),
+                                architect: 'AetherNexus-Core',
+                            });
                         }
                         const toolExecutionOutputJson = await dispatchMcpToolCall(pendingToolInvocation);
                         mutatingConversationThread.push({
@@ -485,6 +493,7 @@ export async function infrastructureEvaluationLoop() {
     console.error("[ORCHESTRATOR_BOOTSTRAP] AetherNexus Autonomous Orchestrator — Evaluation loop initialized.");
     const executeEvaluationCycle = async () => {
         console.error(`[ORCHESTRATOR_CYCLE_START] Timestamp: ${new Date().toISOString()}`);
+        aiLogger.emit('insight', { text: '[AI] Evaluation cycle started — ingesting live telemetry snapshot.', level: 'info', timestamp: new Date().toISOString(), architect: 'AetherNexus-Core' });
         try {
             const currentTelemetrySnapshot = await simulateDomain1TelemetryIngress();
             const telemetryContextMessage = {
