@@ -460,10 +460,9 @@ async function executeAgenticReasoningCycle(activeConversationThread) {
     return mutatingConversationThread;
 }
 // ─── Infrastructure Evaluation Loop (10s polling cadence) ─────────────────────
-export async function infrastructureEvaluationLoop() {
-    console.error("[ORCHESTRATOR_BOOTSTRAP] AetherNexus Autonomous Orchestrator — Evaluation loop initialized.");
-    const executeEvaluationCycle = async () => {
-        console.error(`[ORCHESTRATOR_CYCLE_START] Timestamp: ${new Date().toISOString()}`);
+console.error("[ORCHESTRATOR_BOOTSTRAP] AetherNexus Autonomous Orchestrator — Evaluation loop initialized.");
+async function executeEvaluationCycle() {
+    console.error(`[ORCHESTRATOR_CYCLE_START] Timestamp: ${new Date().toISOString()}`);
         writeAiLog({ text: '[AI] Evaluation cycle started — ingesting live telemetry snapshot.', level: 'info', timestamp: new Date().toISOString(), architect: 'AetherNexus-Core' });
         try {
             const currentTelemetrySnapshot = await simulateDomain1TelemetryIngress();
@@ -561,15 +560,9 @@ export async function infrastructureEvaluationLoop() {
             console.error("[ORCHESTRATOR_EVALUATION_CYCLE_EXCEPTION]", evaluationCycleException);
         }
         console.error(`[ORCHESTRATOR_CYCLE_END] Next cycle in ${resolvedPollingIntervalMs}ms.`);
-    };
-    // Execute immediately on startup, then on interval.
-    await executeEvaluationCycle();
-    setInterval(() => {
-        void executeEvaluationCycle();
-    }, resolvedPollingIntervalMs);
 }
+
 // ─── Entrypoint Guard ──────────────────────────────────────────────────────────
-// Add this right below the executeEvaluationCycle function block
 export function bootOrchestrator() {
     console.error("[ORCHESTRATOR_BOOTSTRAP] Engine ignition. AI evaluation loop starting...");
     executeEvaluationCycle(); // Run immediately on boot
