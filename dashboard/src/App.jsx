@@ -315,7 +315,7 @@ export default function App() {
                     {isAiLog ? (
                       <>
                         <div style={{ color: AI_LEVEL_COLORS[log.level] || '#00e5ff', marginBottom: '3px', fontSize: '10px', fontFamily: 'monospace' }}>
-                          [{new Date(log.timestamp).toLocaleTimeString()}] <{log.architect}> [{log.level?.toUpperCase()}]
+                          { `[${new Date(log.timestamp).toLocaleTimeString()}] <${log.architect}> [${log.level?.toUpperCase()}]` }
                         </div>
                         <div style={{ color: '#e0e0e0', lineHeight: '1.4' }}>{log.text}</div>
                       </>
