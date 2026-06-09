@@ -119,6 +119,7 @@ function DataFlowSystem({ apiGatewayPos, racks, statuses, trafficWeights }) {
 }
 
 export default function App() {
+  console.log('[DEBUG] Active Gateway URL:', import.meta.env.VITE_API_GATEWAY_URL);
   const [currentView, setCurrentView] = useState('topology');
   const [logs, setLogs] = useState([]);
   const [trafficWeights, setTrafficWeights] = useState({ usEastCluster: 0.33, euWestCluster: 0.33, apSouthCluster: 0.34 });
@@ -137,7 +138,7 @@ export default function App() {
   ], []);
 
   useEffect(() => {
-    const socket = io(GATEWAY_URL, { reconnectionDelayMax: 10000 });
+    const socket = io(GATEWAY_URL, { transports: ['websocket'], upgrade: false });
 
     socket.on('aethernexus-telemetry-broadcast', (data) => {
       setLogs(prev => [...prev, data].slice(-100));
