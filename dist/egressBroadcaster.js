@@ -1,6 +1,31 @@
 import { createServer as createHttpServer } from "http";
 import { Server as SocketIoServer } from "socket.io";
-import { aiLogger } from "../aiLogger.js";
+import { MongoClient } from "mongodb";
+
+let db = null;
+if (process.env.MONGODB_URI) {
+    const client = new MongoClient(process.env.MONGODB_URI);
+    client.connect().then(() => {
+        db = client.db();
+        console.error("[egressBroadcaster] Connected to MongoDB for AI logs");
+    }).catch(err => {
+        console.error("[egressBroadcaster] MongoDB connection failed", err);
+    });
+}
+
+export async function writeAiLog(payload) {
+    if (!db) return;
+    try {
+        await db.collection('ai_logs').insertOne({
+            timestamp: payload.timestamp ? new Date(payload.timestamp) : new Date(),
+            level: payload.level,
+            text: payload.text,
+            architect: payload.architect || 'AetherNexus-Core'
+        });
+    } catch (e) {
+        console.error("[writeAiLog] Error inserting AI log:", e);
+    }
+}
 // ─── Socket.io Server Initialization ──────────────────────────────────────────
 const resolvedEgressSocketPort = parseInt(process.env["AETHERNEXUS_SOCKET_EGRESS_PORT"] ?? "4000", 10);
 const aetherNexusHttpTransportServer = createHttpServer();
@@ -24,12 +49,12 @@ export function emitArchitecturalThoughtStreamPacket(architecturalThoughtStreamP
         aetherNexusSocketIoEgressServer.emit("aethernexus-telemetry-broadcast", architecturalThoughtStreamPacket);
         console.error(`[SOCKET_BROADCAST_EMITTED] Event: aethernexus-telemetry-broadcast | ThreatLevel: ${architecturalThoughtStreamPacket.incidentThreatLevelColor} | Action: ${architecturalThoughtStreamPacket.executedMitigationAction}`);
 
-        // Emit tagged AI insight to the bridge listener in server.ts
+        // Emit tagged AI insight to MongoDB
         const level = architecturalThoughtStreamPacket.incidentThreatLevelColor === 'CRITICAL_RED' ? 'critical'
             : architecturalThoughtStreamPacket.incidentThreatLevelColor === 'WARNING_AMBER' ? 'warning'
             : architecturalThoughtStreamPacket.incidentThreatLevelColor === 'NOMINAL_GREEN' ? 'success'
             : 'info';
-        aiLogger.emit('insight', {
+        writeAiLog({
             text: `[AI] ${architecturalThoughtStreamPacket.executedMitigationAction}`,
             level,
             timestamp: architecturalThoughtStreamPacket.eventTimestamp ?? new Date().toISOString(),
