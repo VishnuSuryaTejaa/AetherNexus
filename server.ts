@@ -13,6 +13,7 @@ import {
 } from './loadbalancer';
 // @ts-ignore - Bypassing TS strict mode for compiled JS module
 import { bootOrchestrator } from './dist/orchestrator.js';
+// @ts-ignore - Bypassing TS strict mode for patched JS export
 import { setSharedSocket } from './dist/egressBroadcaster.js';
 // Local region type — microservices run as separate processes
 type Region = 'usEastCluster' | 'euWestCluster' | 'apSouthCluster';
