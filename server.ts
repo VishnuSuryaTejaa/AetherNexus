@@ -13,6 +13,7 @@ import {
 } from './loadbalancer';
 // @ts-ignore - Bypassing TS strict mode for compiled JS module
 import { bootOrchestrator } from './dist/orchestrator.js';
+import { setSharedSocket } from './dist/egressBroadcaster.js';
 // Local region type — microservices run as separate processes
 type Region = 'usEastCluster' | 'euWestCluster' | 'apSouthCluster';
 
@@ -24,6 +25,7 @@ const httpServer = http.createServer(app);
 const io = new SocketIOServer(httpServer, {
   cors: { origin: '*', methods: ['GET', 'POST'] },
 });
+setSharedSocket(io);
 const PORT = process.env.PORT || 4000;
 const MONGODB_URI = process.env.MONGODB_URI;
 
@@ -104,14 +106,13 @@ async function connectDb() {
     db = client.db();
     mongoConnected = true;
     console.log('[server] Connected to MongoDB Atlas successfully.');
-    bootOrchestrator();
-    
-    // Boot the AI evaluation engine inside the main process
-    bootOrchestrator();
-    console.log('[server] AI Orchestrator engine initialized and running.');
     
     // Initialize the routing table on startup
     await recalculateRouting(db);
+
+    // Boot the AI evaluation engine inside the main process
+    await bootOrchestrator();
+    console.log('[server] AI Orchestrator engine initialized and running.');
     
     // High-frequency telemetry broadcast loop
     setInterval(async () => {
@@ -262,6 +263,13 @@ app.post('/api/rebalance', async (req: Request, res: Response) => {
     });
   }
 
+  if (sourceRegion === targetRegion) {
+    return res.status(400).json({
+      success: false,
+      message: 'sourceRegion and targetRegion cannot be the same',
+    });
+  }
+
   const resolvedSourceRegion = CLUSTER_ID_TO_REGION[sourceRegion];
   const resolvedTargetRegion = CLUSTER_ID_TO_REGION[targetRegion];
 
@@ -352,8 +360,19 @@ app.post('/api/chaos/inject-fault', async (req: Request, res: Response) => {
 
   try {
     injectFault(targetClusterRegion as Region, faultType as any);
-    if (mongoConnected && faultType === 'NETWORK_DROPOUT') {
-      await recalculateRouting(db);
+    if (mongoConnected) {
+      const metricDoc = {
+        timestamp: new Date(),
+        region: normalizeRegion(targetClusterRegion),
+        computeLoadPercentage: 98.0,
+        volatileMemoryAllocationGb: 14.0,
+        clusterOperationalStatus: 'CRITICAL',
+      };
+      await db.collection<any>('server_health').insertOne(metricDoc);
+
+      if (faultType === 'NETWORK_DROPOUT') {
+        await recalculateRouting(db);
+      }
     }
 
     console.log(`[chaos] Fault ${faultType} injected into ${targetClusterRegion}`);
@@ -494,8 +513,8 @@ app.post('/api/chaos/reset', async (req: Request, res: Response) => {
       await db.collection<any>('server_health').insertOne({
         timestamp: restoreTime,
         region: r,
-        computeLoadPercentage: 25.0,
-        volatileMemoryAllocationGb: 4.5,
+        computeLoadPercentage: parseFloat((25.0 + Math.random() * 5.0).toFixed(1)),
+        volatileMemoryAllocationGb: parseFloat((4.5 + Math.random() * 1.5).toFixed(1)),
         clusterOperationalStatus: 'STABLE',
       });
     }

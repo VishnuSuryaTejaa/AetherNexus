@@ -22,12 +22,13 @@ const rackMat = new THREE.MeshStandardMaterial({
   opacity: 0.9,
 });
 
+const wireframeGeo = new THREE.BoxGeometry(3.1, 0.6, 2.1);
+
 function ApiGateway({ position }) {
   return (
     <group position={position}>
       <mesh geometry={gatewayGeo} material={rackMat} />
-      <mesh>
-        <boxGeometry args={[3.1, 0.6, 2.1]} />
+      <mesh geometry={wireframeGeo}>
         <meshBasicMaterial color="#00e5ff" wireframe transparent opacity={0.5} />
       </mesh>
       <Html center position={[0, 1, 0]}>
@@ -58,6 +59,8 @@ function DataFlowSystem({ apiGatewayPos, racks, statuses, trafficWeights }) {
 
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const colorObj = useMemo(() => new THREE.Color(), []);
+  const gatewayVec = useMemo(() => new THREE.Vector3(...apiGatewayPos), [apiGatewayPos]);
+  const rackVecs = useMemo(() => racks.map(r => new THREE.Vector3(...r.position)), [racks]);
 
   useFrame((state, delta) => {
     if (!meshRef.current) return;
@@ -78,9 +81,10 @@ function DataFlowSystem({ apiGatewayPos, racks, statuses, trafficWeights }) {
         if (sum > 0) {
           const rand = Math.random();
           let runningTotal = 0;
+          p.rackIdx = 0;
           for (let idx = 0; idx < normalizedWeights.length; idx++) {
             runningTotal += normalizedWeights[idx];
-            if (rand <= runningTotal) {
+            if (rand < runningTotal) {
               p.rackIdx = idx;
               break;
             }
@@ -91,8 +95,8 @@ function DataFlowSystem({ apiGatewayPos, racks, statuses, trafficWeights }) {
       const targetRack = racks[p.rackIdx];
       
       dummy.position.lerpVectors(
-        new THREE.Vector3(...apiGatewayPos),
-        new THREE.Vector3(...targetRack.position),
+        gatewayVec,
+        rackVecs[p.rackIdx],
         p.progress
       );
       dummy.updateMatrix();
@@ -122,7 +126,7 @@ export default function App() {
   console.log('[DEBUG] Active Gateway URL:', import.meta.env.VITE_API_GATEWAY_URL);
   const [currentView, setCurrentView] = useState('topology');
   const [logs, setLogs] = useState([]);
-  const [trafficWeights, setTrafficWeights] = useState({ usEastCluster: 0.33, euWestCluster: 0.33, apSouthCluster: 0.34 });
+  const [trafficWeights, setTrafficWeights] = useState({ usEastCluster: 33.3, euWestCluster: 33.3, apSouthCluster: 33.4 });
   const [statuses, setStatuses] = useState({
     usEastCluster: 'NOMINAL_GREEN',
     euWestCluster: 'NOMINAL_GREEN',
@@ -130,6 +134,14 @@ export default function App() {
   });
   const [healingProgresses, setHealingProgresses] = useState({});
   const [liveMetrics, setLiveMetrics] = useState({});
+
+  const mitigationIntervals = useRef({});
+
+  useEffect(() => {
+    return () => {
+      Object.values(mitigationIntervals.current).forEach(clearInterval);
+    };
+  }, []);
 
   const apiGatewayPos = useMemo(() => [0, 6, 0], []);
   const racks = useMemo(() => [
@@ -182,6 +194,8 @@ export default function App() {
           setStatuses(prev => ({ ...prev, [regionId]: 'CRITICAL_RED' }));
         } else if (cpu > 75) {
           setStatuses(prev => ({ ...prev, [regionId]: 'WARNING_AMBER' }));
+        } else {
+          setStatuses(prev => ({ ...prev, [regionId]: 'NOMINAL_GREEN' }));
         }
 
         const logEntry = `[${new Date().toLocaleTimeString()}] ${regionId.toUpperCase()} | CPU: ${cpu.toFixed(1)}% | RAM: ${m?.volatileMemoryAllocationGb?.toFixed(1)}GB | Status: ${dbStatus}`;
@@ -207,6 +221,11 @@ export default function App() {
     setStatuses(prev => ({ ...prev, [region]: 'HEALING' }));
     setHealingProgresses(prev => ({ ...prev, [region]: 0 }));
     let progress = 0;
+    
+    if (mitigationIntervals.current[region]) {
+      clearInterval(mitigationIntervals.current[region]);
+    }
+
     const interval = setInterval(() => {
       progress += 1;
       if (progress >= 100) {
@@ -217,6 +236,8 @@ export default function App() {
         setHealingProgresses(prev => ({ ...prev, [region]: progress }));
       }
     }, 300);
+    
+    mitigationIntervals.current[region] = interval;
     try {
       await fetch(`${GATEWAY_URL}/api/mitigate`, {
         method: 'POST',
@@ -260,7 +281,7 @@ export default function App() {
 
             <DataFlowSystem apiGatewayPos={apiGatewayPos} racks={racks} statuses={statuses} trafficWeights={trafficWeights} />
 
-            <OrbitControls enablePan={true} maxPolarAngle={Math.PI / 2} />
+            <OrbitControls enablePan={true} maxPolarAngle={Math.PI / 2} minPolarAngle={Math.PI / 6} />
           </Canvas>
 
           {/* Glassmorphism Sidebar */}
@@ -291,7 +312,7 @@ export default function App() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flexGrow: 1, overflowY: 'auto' }}>
               {logs.map((log, i) => {
                 const AI_LEVEL_COLORS = { info: '#00e5ff', warning: '#ffaa00', critical: '#ff3333', success: '#00ff41' };
-                const isAiLog = log?.__aiLog === true;
+                const isAiLog = log?.text !== undefined && log?.level !== undefined;
                 const isString = typeof log === 'string';
                 
                 let borderColor = '#00ff41';

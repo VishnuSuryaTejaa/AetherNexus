@@ -6,4 +6,4 @@ export interface ArchitecturalThoughtStreamPacket {
 }
 export declare function emitArchitecturalThoughtStreamPacket(architecturalThoughtStreamPacket: ArchitecturalThoughtStreamPacket): void;
 export declare function bootstrapEgressBroadcastServer(): Promise<void>;
-//# sourceMappingURL=egressBroadcaster.d.ts.map
+//# sourceMappingURL=egressBroadcaster.d.ts.mapa

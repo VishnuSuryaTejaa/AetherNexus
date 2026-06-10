@@ -36,6 +36,8 @@ const totalLEDs = numBlades * ledsPerBlade;
 const ledGeo = new THREE.BoxGeometry(0.05, 0.05, 0.02);
 const ledMat = new THREE.MeshBasicMaterial({ color: '#ffffff' });
 
+const sharedColor = new THREE.Color();
+
 export default function ServerRack({ position, label, status, healingProgress }) {
   const ledMeshRef = useRef();
 
@@ -73,17 +75,16 @@ export default function ServerRack({ position, label, status, healingProgress })
     const time = state.clock.elapsedTime;
     
     const speedMultiplier = status === 'CRITICAL_RED' ? 4 : (status === 'WARNING_AMBER' ? 2 : (status === 'HEALING' ? 3 : 1));
-    const color = new THREE.Color();
     
     ledData.forEach((led, i) => {
       ledMeshRef.current.setMatrixAt(i, led.matrix);
       const blink = Math.sin(time * led.blinkSpeed * speedMultiplier + led.blinkOffset);
       if (blink > 0) {
-        color.copy(currentColors.base);
+        sharedColor.copy(currentColors.base);
       } else {
-        color.copy(currentColors.dim);
+        sharedColor.copy(currentColors.dim);
       }
-      ledMeshRef.current.setColorAt(i, color);
+      ledMeshRef.current.setColorAt(i, sharedColor);
     });
     
     ledMeshRef.current.instanceMatrix.needsUpdate = true;

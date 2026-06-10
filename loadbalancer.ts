@@ -45,7 +45,7 @@ export async function recalculateRouting(db: Db): Promise<TrafficDistributionMap
 
     if (latest) {
       const status = latest.clusterOperationalStatus;
-      if (status === 'CRITICAL_NETWORK_DOWN' || latest.networkPackets === 0) {
+      if (status === 'CRITICAL_NETWORK_DOWN' || status === 'CRITICAL' || latest.computeLoadPercentage >= 90 || latest.networkPackets === 0) {
         statusMap[r] = false;
       }
     }
@@ -60,9 +60,9 @@ export async function recalculateRouting(db: Db): Promise<TrafficDistributionMap
     distributionMap = {
       'US-East-1': 33.3,
       'EU-West-1': 33.3,
-      'AP-South-1': 33.3,
+      'AP-South-1': 33.4,
     };
-    console.log('[loadbalancer] All regions healthy. Even split: 33.3% each.');
+    console.log('[loadbalancer] All regions healthy. Even split: 33.3, 33.3, 33.4.');
   } else if (activeRegions.length === 2) {
     // One region is down: redistribute traffic weight equally between the other two (50% each)
     distributionMap = {
@@ -72,19 +72,19 @@ export async function recalculateRouting(db: Db): Promise<TrafficDistributionMap
     };
     console.log(`[loadbalancer] Failover: One region down. Active: ${activeRegions.join(', ')}. Split: 50% / 50%.`);
   } else if (activeRegions.length === 1) {
-    // Two regions are down: route 100% of traffic to the single remaining healthy region
+    // Two regions are down: route max 60% of traffic to the single remaining healthy region
     distributionMap = {
-      'US-East-1': statusMap['US-East'] ? 100 : 0,
-      'EU-West-1': statusMap['EU-West'] ? 100 : 0,
-      'AP-South-1': statusMap['AP-South'] ? 100 : 0,
+      'US-East-1': statusMap['US-East'] ? 60 : 0,
+      'EU-West-1': statusMap['EU-West'] ? 60 : 0,
+      'AP-South-1': statusMap['AP-South'] ? 60 : 0,
     };
-    console.log(`[loadbalancer] Critical Failover: Two regions down. Active: ${activeRegions[0]}. Routing 100% to active region.`);
+    console.log(`[loadbalancer] Critical Failover: Two regions down. Active: ${activeRegions[0]}. Routing 60% to active region.`);
   } else {
     // All regions are down: fallback to default split to attempt recovery routing
     distributionMap = {
       'US-East-1': 33.3,
       'EU-West-1': 33.3,
-      'AP-South-1': 33.3,
+      'AP-South-1': 33.4,
     };
     console.log('[loadbalancer] Emergency: All regions down. Fallback to even split.');
   }
@@ -116,6 +116,6 @@ export async function getDistributionMap(db: Db): Promise<TrafficDistributionMap
   return {
     'US-East-1': 33.3,
     'EU-West-1': 33.3,
-    'AP-South-1': 33.3,
+    'AP-South-1': 33.4,
   };
 }

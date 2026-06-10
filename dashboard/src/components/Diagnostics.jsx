@@ -37,9 +37,10 @@ export default function Diagnostics({ onReturn, logs, statuses, trafficWeights }
   if (telemetry && telemetry.telemetry) {
     const { 'US-East-1': us, 'EU-West-1': eu, 'AP-South-1': ap } = telemetry.telemetry;
     const len = Math.max(us?.length || 0, eu?.length || 0, ap?.length || 0);
-    for (let i = len - 1; i >= 0; i--) {
+    for (let i = 0; i < len; i++) {
+      const timestamp = us?.[i]?.timestamp || eu?.[i]?.timestamp || ap?.[i]?.timestamp || Date.now();
       loadData.push({
-        time: new Date(us?.[i]?.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        time: new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
         usEast: us?.[i]?.computeLoadPercentage || 0,
         euWest: eu?.[i]?.computeLoadPercentage || 0,
         apSouth: ap?.[i]?.computeLoadPercentage || 0,
@@ -47,8 +48,8 @@ export default function Diagnostics({ onReturn, logs, statuses, trafficWeights }
     }
 
     const countStatus = (arr) => arr?.reduce((acc, curr) => {
-      if (curr.clusterOperationalStatus.includes('CRITICAL')) acc.critical++;
-      else if (curr.clusterOperationalStatus.includes('DEGRADED')) acc.warning++;
+      if (curr.clusterOperationalStatus === 'CRITICAL' || curr.clusterOperationalStatus === 'CRITICAL_NETWORK_DOWN') acc.critical++;
+      else if (curr.clusterOperationalStatus === 'DEGRADED' || curr.clusterOperationalStatus === 'WARNING_AMBER') acc.warning++;
       else acc.nominal++;
       return acc;
     }, { nominal: 0, warning: 0, critical: 0 }) || { nominal: 0, warning: 0, critical: 0 };
@@ -58,6 +59,9 @@ export default function Diagnostics({ onReturn, logs, statuses, trafficWeights }
       { region: 'EU-West', ...countStatus(eu) },
       { region: 'AP-South', ...countStatus(ap) }
     ];
+  } else if (telemetry === null && loading === false) {
+    // Explicit offline fallback
+    loadData = [];
   } else {
     // Mock fallback if offline
     loadData = [
@@ -74,11 +78,11 @@ export default function Diagnostics({ onReturn, logs, statuses, trafficWeights }
       { name: 'EU-West', value: trafficWeights.euWestCluster || 33.3 },
       { name: 'AP-South', value: trafficWeights.apSouthCluster || 33.4 },
     ];
-  } else if (telemetry && telemetry.traffic_distribution_map) {
+  } else if (telemetry) {
     trafficData = [
-      { name: 'US-East', value: telemetry.traffic_distribution_map['US-East-1'] || 33.3 },
-      { name: 'EU-West', value: telemetry.traffic_distribution_map['EU-West-1'] || 33.3 },
-      { name: 'AP-South', value: telemetry.traffic_distribution_map['AP-South-1'] || 33.3 },
+      { name: 'US-East', value: telemetry?.traffic_distribution_map?.['US-East-1'] || 33.3 },
+      { name: 'EU-West', value: telemetry?.traffic_distribution_map?.['EU-West-1'] || 33.3 },
+      { name: 'AP-South', value: telemetry?.traffic_distribution_map?.['AP-South-1'] || 33.3 },
     ];
   }
 
@@ -167,7 +171,7 @@ export default function Diagnostics({ onReturn, logs, statuses, trafficWeights }
           </div>
           <div>
             <div style={{ color: '#888', fontSize: '14px', marginBottom: '5px' }}>AI Mitigations Executed</div>
-            <div style={{ fontSize: '28px', color: '#00e5ff', fontWeight: 'bold', textShadow: '0 0 10px rgba(0, 229, 255, 0.3)' }}>{logs?.length || 0}</div>
+            <div style={{ fontSize: '28px', color: '#00e5ff', fontWeight: 'bold', textShadow: '0 0 10px rgba(0, 229, 255, 0.3)' }}>{logs?.filter(l => l.executedMitigationAction && !l.text).length || 0}</div>
           </div>
         </div>
 

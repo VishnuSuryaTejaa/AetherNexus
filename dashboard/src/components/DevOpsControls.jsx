@@ -10,11 +10,12 @@ const clusters = [
 
 export default function DevOpsControls({ onMitigate }) {
   const handleInject = async (region, faultType) => {
+    const endpoint = faultType === 'CPU_SPIKE' ? '/api/chaos/spike-cpu' : '/api/chaos/kill-network';
     try {
-      await fetch(`${GATEWAY_URL}/api/chaos/inject-fault`, {
+      await fetch(`${GATEWAY_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetClusterRegion: region, faultType })
+        body: JSON.stringify({ targetClusterRegion: region })
       });
     } catch (e) {
       console.error('Chaos injection failed', e);
@@ -58,8 +59,8 @@ export default function DevOpsControls({ onMitigate }) {
           <button onClick={() => handleInject(cluster.id, 'CPU_SPIKE')} style={btnStyle('#ff003c')}>
             Inject CPU Spike
           </button>
-          <button onClick={() => handleInject(cluster.id, 'MEMORY_OVERFLOW')} style={btnStyle('#ffb000')}>
-            Inject Mem Leak
+          <button onClick={() => handleInject(cluster.id, 'NETWORK_DROP')} style={btnStyle('#ffb000')}>
+            Kill Network
           </button>
           <button onClick={() => onMitigate && onMitigate(cluster.id)} style={btnStyle('#00ff41')}>
             Force Mitigation

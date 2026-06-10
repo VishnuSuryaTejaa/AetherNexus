@@ -1,5 +1,6 @@
 import * as dotenv from "dotenv"; dotenv.config({ override: true });
 import OpenAI from "openai";
+import fetch from "node-fetch";
 import fs from "fs";
 import path from "path";
 import { emitArchitecturalThoughtStreamPacket, bootstrapEgressBroadcastServer, writeAiLog, getLiveTelemetry } from "./egressBroadcaster.js";
@@ -33,6 +34,7 @@ if (groqKeyPool.length === 0) {
 }
 
 let currentKeyIndex = 0;
+const clusterMitigationCycles = {};
 
 let aetherNexusLlmClient = new OpenAI({
     apiKey: groqKeyPool[currentKeyIndex],
@@ -335,12 +337,18 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
             }
             case "requestHumanOverrideClearance": {
                 const overrideClearanceRequest = JSON.parse(toolArgumentsJson);
+                let targetRegion = overrideClearanceRequest.targetClusterRegion || "usEastCluster";
+                if (overrideClearanceRequest.mitigationActionSummary?.includes("euWestCluster")) targetRegion = "euWestCluster";
+                if (overrideClearanceRequest.mitigationActionSummary?.includes("apSouthCluster")) targetRegion = "apSouthCluster";
+                if (overrideClearanceRequest.mitigationActionSummary?.includes("usEastCluster")) targetRegion = "usEastCluster";
+                
                 // [LIVE] — Wire to HITL authorization service in production.
                 const overrideClearanceAcknowledgement = {
                     clearanceRequestStatus: "PENDING_HUMAN_AUTHORIZATION",
                     incidentClassificationCode: overrideClearanceRequest.incidentClassificationCode,
                     autonomousDecisionRiskLevel: overrideClearanceRequest.autonomousDecisionRiskLevel,
                     requestingAgentIdentifier: overrideClearanceRequest.requestingAgentIdentifier,
+                    targetClusterRegion: targetRegion,
                     clearanceRequestTimestamp: new Date().toISOString(),
                     estimatedAuthorizationWindowMs: 300000,
                 };
@@ -350,6 +358,7 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
                     principalArchitect: "AetherNexus-Core",
                     executedMitigationAction: `Human override clearance requested — Incident: ${overrideClearanceRequest.incidentClassificationCode} | Risk: ${overrideClearanceRequest.autonomousDecisionRiskLevel}`,
                     incidentThreatLevelColor: "CRITICAL_RED",
+                    targetClusterRegion: targetRegion,
                 };
                 emitArchitecturalThoughtStreamPacket(overrideClearanceBroadcastPacket);
                 return JSON.stringify(overrideClearanceAcknowledgement);
@@ -359,6 +368,19 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
                 if (clusterMitigationCycles[loadBalanceDirective.targetClusterRegion] !== undefined) {
                     clusterMitigationCycles[loadBalanceDirective.targetClusterRegion] = 4;
                 }
+                
+                try {
+                    await fetch(`${resolvedDomain1IngressBaseUrl}/api/rebalance`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            sourceRegion: loadBalanceDirective.targetClusterRegion,
+                            targetRegion: loadBalanceDirective.targetClusterRegion === "euWestCluster" ? "usEastCluster" : "euWestCluster",
+                            trafficShiftPercentage: 50
+                        })
+                    });
+                } catch(e) {}
+
                 const loadBalanceAcknowledgement = {
                     dispatchStatus: "ACKNOWLEDGED",
                     targetClusterRegion: loadBalanceDirective.targetClusterRegion,
@@ -405,7 +427,13 @@ async function executeAgenticReasoningCycle(activeConversationThread) {
 
     while (retryCount <= MAX_RETRIES) {
         try {
+            let stepCount = 0;
             while (true) {
+                stepCount++;
+                if (stepCount > 5) {
+                    console.error("[ORCHESTRATOR_AGENTIC_CYCLE_EXCEPTION] Maximum agentic reasoning steps exceeded.");
+                    break;
+                }
                 const llmCompletionResponse = await aetherNexusLlmClient.chat.completions.create({
                     model: resolvedOrchestratorModel,
                     messages: mutatingConversationThread,
@@ -522,7 +550,12 @@ ${AUTONOMOUS_CONTROL_PLANE_SYSTEM_PROMPT}`;
                     if (firstBrace !== -1 && lastBrace !== -1 && lastBrace >= firstBrace) {
                         let cleanJsonString = terminalLlmOutputText.substring(firstBrace, lastBrace + 1);
                         cleanJsonString = cleanJsonString.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-                        let parsedLlmEgressDirective = JSON.parse(cleanJsonString);
+                        let parsedLlmEgressDirective;
+                        try {
+                            parsedLlmEgressDirective = JSON.parse(cleanJsonString);
+                        } catch(e) {
+                            throw new Error("Invalid JSON parsed from LLM");
+                        }
 
                         const isAllStable = Object.values(currentTelemetrySnapshot).every(c => c.clusterOperationalStatus === "STABLE");
                         if (isAllStable) {
@@ -554,12 +587,12 @@ ${AUTONOMOUS_CONTROL_PLANE_SYSTEM_PROMPT}`;
                         emitArchitecturalThoughtStreamPacket(architecturalThoughtStreamPacket);
                     }
                     else {
-                        // LLM did not embed a structured JSON block — emit a NOMINAL fallback.
+                        // LLM did not embed a structured JSON block — emit a WARNING_AMBER fallback.
                         const nominalCycleBroadcastPacket = {
                             eventTimestamp: new Date().toISOString(),
                             principalArchitect: "AetherNexus-Core",
-                            executedMitigationAction: "Evaluation cycle completed — infrastructure nominal.",
-                            incidentThreatLevelColor: "NOMINAL_GREEN",
+                            executedMitigationAction: "AI output unparseable - Human investigation required",
+                            incidentThreatLevelColor: "WARNING_AMBER",
                             trafficDistribution: {
                                 usEastCluster: 0.33,
                                 euWestCluster: 0.33,
@@ -574,8 +607,8 @@ ${AUTONOMOUS_CONTROL_PLANE_SYSTEM_PROMPT}`;
                     const nominalCycleBroadcastPacket = {
                         eventTimestamp: new Date().toISOString(),
                         principalArchitect: "AetherNexus-Core",
-                        executedMitigationAction: "Evaluation cycle completed — fallback to nominal.",
-                        incidentThreatLevelColor: "NOMINAL_GREEN",
+                        executedMitigationAction: "AI output unparseable - Human investigation required",
+                        incidentThreatLevelColor: "WARNING_AMBER",
                         trafficDistribution: { usEastCluster: 0.33, euWestCluster: 0.33, apSouthCluster: 0.34 }
                     };
                     emitArchitecturalThoughtStreamPacket(nominalCycleBroadcastPacket);
@@ -589,8 +622,9 @@ ${AUTONOMOUS_CONTROL_PLANE_SYSTEM_PROMPT}`;
 }
 
 // ─── Entrypoint Guard ──────────────────────────────────────────────────────────
-export function bootOrchestrator() {
+export async function bootOrchestrator() {
     console.error("[ORCHESTRATOR_BOOTSTRAP] Engine ignition. AI evaluation loop starting...");
+    await bootstrapEgressBroadcastServer();
     executeEvaluationCycle(); // Run immediately on boot
     setInterval(executeEvaluationCycle, resolvedPollingIntervalMs); // Run every 15 seconds
 }
