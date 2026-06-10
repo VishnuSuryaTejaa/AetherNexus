@@ -13,9 +13,9 @@ const MONGODB_URI = process.env.MONGODB_URI;
 
 // Target Node URLs from environment variables
 const NODE_URLS = {
-  'US-East-1': process.env.NODE_US_URL || 'https://oweyr-health-node-us-east.hf.space',
-  'EU-West-1': process.env.NODE_EU_URL || 'https://oweyr-health-node-eu-west.hf.space',
-  'AP-South-1': process.env.NODE_ASIA_URL || 'https://oweyr-health-node-ap-south.hf.space',
+  'US-East-1': process.env.US_EAST_URL || 'https://oweyr-health-node-us-east.hf.space',
+  'EU-West-1': process.env.EU_WEST_URL || 'https://oweyr-health-node-eu-west.hf.space',
+  'AP-South-1': process.env.AP_SOUTH_URL || 'https://oweyr-health-node-ap-south.hf.space',
 };
 
 interface RoutingTable {
@@ -91,69 +91,6 @@ function selectTargetRegion(): keyof RoutingTable {
 
 app.use(cors());
 
-// Parse JSON specifically for the rebalance endpoint
-app.post('/api/admin/rebalance', express.json(), async (req: Request, res: Response) => {
-  const rawMap = req.body.traffic_distribution_map || req.body;
-
-  if (!rawMap || typeof rawMap !== 'object') {
-    return res.status(400).json({ error: 'Invalid or missing traffic distribution map payload' });
-  }
-
-  // Parse and normalize the incoming distribution percentages
-  const newWeights: Partial<RoutingTable> = {};
-  for (const rawKey of Object.keys(rawMap)) {
-    const normalizedKey = normalizeRoutingKey(rawKey);
-    if (normalizedKey) {
-      newWeights[normalizedKey] = parseFloat(rawMap[rawKey]);
-    }
-  }
-
-  // Verify we received all three weights
-  if (
-    typeof newWeights['US-East-1'] !== 'number' ||
-    typeof newWeights['EU-West-1'] !== 'number' ||
-    typeof newWeights['AP-South-1'] !== 'number'
-  ) {
-    return res.status(400).json({
-      error: 'Incomplete routing map. US-East-1, EU-West-1, and AP-South-1 weights must be provided.',
-      received: newWeights,
-    });
-  }
-
-  // Update in-memory weights
-  routingTable = {
-    'US-East-1': newWeights['US-East-1'],
-    'EU-West-1': newWeights['EU-West-1'],
-    'AP-South-1': newWeights['AP-South-1'],
-  };
-
-  console.log('[gateway] Routing table updated by admin rebalance command:', routingTable);
-
-  // Sync to database if available
-  if (mongoConnected) {
-    try {
-      await db.collection<any>('load_balancer_state').updateOne(
-        { _id: 'current_state' },
-        {
-          $set: {
-            traffic_distribution_map: routingTable,
-            updatedAt: new Date(),
-          },
-        },
-        { upsert: true }
-      );
-      console.log('[gateway] Persisted updated routing table to database.');
-    } catch (err: any) {
-      console.error('[gateway] Failed to persist routing table to DB:', err.message);
-    }
-  }
-
-  return res.json({
-    success: true,
-    message: 'Routing weights successfully updated.',
-    traffic_distribution_map: routingTable,
-  });
-});
 
 // ── http-proxy-middleware Gateway Setup ─────────────────────────────────────
 

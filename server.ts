@@ -5,6 +5,8 @@ import { Server as SocketIOServer } from 'socket.io';
 import { MongoClient, Db } from 'mongodb';
 import dotenv from 'dotenv';
 import fetch from 'node-fetch';
+
+// NOTE: mcpServer.js is deprecated. The system utilizes the inline dispatchMcpToolCall in orchestrator.js for tool execution.
 import {
   recalculateRouting,
   getDistributionMap,
@@ -78,11 +80,7 @@ async function injectFault(region: Region, faultType: string) {
   }
 }
 
-async function pollClustersAndWriteToDb(database: Db) {
-  // Legacy bypass: In our true cloud model, the remote nodes write their own telemetry to MongoDB directly.
-  // This empty bridge satisfies the TypeScript compiler without causing double-writing.
-  return Promise.resolve();
-}
+
 // ─────────────────────────────────────────────────────────────────────────
 app.use(cors({
   origin: '*',
@@ -118,22 +116,20 @@ async function connectDb() {
     // High-frequency telemetry broadcast loop
     setInterval(async () => {
       try {
+        if (!mongoConnected) {
+          const client = new MongoClient(MONGODB_URI!);
+          await client.connect();
+          db = client.db();
+          mongoConnected = true;
+          console.log('[server] Reconnected to MongoDB Atlas successfully.');
+        }
         const liveData = await getLatestMetrics();
         if (liveData) io.emit('live-metrics-stream', liveData);
       } catch (err: any) {
+        mongoConnected = false;
         console.error('[Socket] Broadcast error:', err.message);
       }
     }, 2000);
-
-    // AI Insight Bridge: Watch MongoDB Change Stream and forward to frontend WebSocket clients
-    const aiLogsStream = db.collection('ai_logs').watch();
-    aiLogsStream.on('change', (change) => {
-      if (change.operationType === 'insert') {
-        const payload = change.fullDocument;
-        io.emit('ai-log', payload);
-        console.log(`[AI_BRIDGE_MONGO] Forwarded ai-log: [${payload?.level?.toUpperCase()}] ${payload?.text}`);
-      }
-    });
   } catch (err: any) {
     console.error('[server] MongoDB connection failed:', err.message);
     process.exit(1);
@@ -227,7 +223,7 @@ app.post('/api/mitigate', async (req: Request, res: Response) => {
 
   try {
     // Execute mitigation: clear memory arrays, stop math loops, restore network
-    mitigateCluster(targetClusterRegion as Region);
+    await mitigateCluster(targetClusterRegion as Region);
     
     if (mongoConnected) {
       await recalculateRouting(db);
@@ -311,8 +307,10 @@ app.post('/api/rebalance', async (req: Request, res: Response) => {
     );
     // Derive the third unaffected region's weight as the 100-sum remainder
     // to guarantee the distribution always sums to exactly 100.
-    const thirdDistKey = (Object.keys(updatedDistribution) as Array<keyof typeof updatedDistribution>)
-      .find((k) => k !== sourceDistKey && k !== targetDistKey)!;
+    let thirdDistKey: keyof typeof updatedDistribution = 'US-East-1';
+    if (sourceDistKey !== 'US-East-1' && targetDistKey !== 'US-East-1') thirdDistKey = 'US-East-1';
+    else if (sourceDistKey !== 'EU-West-1' && targetDistKey !== 'EU-West-1') thirdDistKey = 'EU-West-1';
+    else thirdDistKey = 'AP-South-1';
     const derivedThirdWeight = parseFloat((100 - mutatedSourceWeight - mutatedTargetWeight).toFixed(4));
     updatedDistribution[sourceDistKey] = mutatedSourceWeight;
     updatedDistribution[targetDistKey] = mutatedTargetWeight;

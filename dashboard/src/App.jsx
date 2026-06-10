@@ -152,6 +152,28 @@ export default function App() {
 
   useEffect(() => {
     const socket = io(GATEWAY_URL, { transports: ['websocket'], upgrade: false });
+    socket.on('connect', () => {
+      fetch(`${GATEWAY_URL}/api/telemetry`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.infrastructureState) {
+            setLiveMetrics(data.infrastructureState);
+            Object.entries(data.infrastructureState).forEach(([regionId, metrics]) => {
+              const cpu = metrics?.computeLoadPercentage ?? 0;
+              const dbStatus = metrics?.clusterOperationalStatus;
+              if (dbStatus === 'HEALING') {
+                setStatuses(prev => ({ ...prev, [regionId]: 'HEALING' }));
+              } else if (cpu > 90) {
+                setStatuses(prev => ({ ...prev, [regionId]: 'CRITICAL_RED' }));
+              } else if (cpu > 75) {
+                setStatuses(prev => ({ ...prev, [regionId]: 'WARNING_AMBER' }));
+              } else {
+                setStatuses(prev => ({ ...prev, [regionId]: 'NOMINAL_GREEN' }));
+              }
+            });
+          }
+        }).catch(err => console.error('Reconnect fetch failed', err));
+    });
 
     socket.on('aethernexus-telemetry-broadcast', (data) => {
       setLogs(prev => [...prev, data].slice(-100));
@@ -218,34 +240,38 @@ export default function App() {
   }, []);
 
   const handleManualMitigate = async (region) => {
-    setStatuses(prev => ({ ...prev, [region]: 'HEALING' }));
-    setHealingProgresses(prev => ({ ...prev, [region]: 0 }));
-    let progress = 0;
-    
-    if (mitigationIntervals.current[region]) {
-      clearInterval(mitigationIntervals.current[region]);
-    }
-
-    const interval = setInterval(() => {
-      progress += 1;
-      if (progress >= 100) {
-        clearInterval(interval);
-        setStatuses(prev => ({ ...prev, [region]: 'NOMINAL_GREEN' }));
-        setHealingProgresses(prev => ({ ...prev, [region]: null }));
-      } else {
-        setHealingProgresses(prev => ({ ...prev, [region]: progress }));
-      }
-    }, 300);
-    
-    mitigationIntervals.current[region] = interval;
     try {
-      await fetch(`${GATEWAY_URL}/api/mitigate`, {
+      const res = await fetch(`${GATEWAY_URL}/api/mitigate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetClusterRegion: region, cacheLayerNamespace: 'manual-ui-override' })
       });
+      const data = await res.json();
+      if (!data.success) throw new Error("Mitigation failed on backend");
+
+      setStatuses(prev => ({ ...prev, [region]: 'HEALING' }));
+      setHealingProgresses(prev => ({ ...prev, [region]: 0 }));
+      let progress = 0;
+      
+      if (mitigationIntervals.current[region]) {
+        clearInterval(mitigationIntervals.current[region]);
+      }
+
+      const interval = setInterval(() => {
+        progress += 1;
+        if (progress >= 100) {
+          clearInterval(interval);
+          setStatuses(prev => ({ ...prev, [region]: 'NOMINAL_GREEN' }));
+          setHealingProgresses(prev => ({ ...prev, [region]: null }));
+        } else {
+          setHealingProgresses(prev => ({ ...prev, [region]: progress }));
+        }
+      }, 300);
+      
+      mitigationIntervals.current[region] = interval;
     } catch (e) {
       console.error('Manual mitigation failed', e);
+      setStatuses(prev => ({ ...prev, [region]: 'CRITICAL_RED' }));
     }
   };
 

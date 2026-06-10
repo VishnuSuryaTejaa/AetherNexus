@@ -39,8 +39,12 @@ export async function getLiveTelemetry() {
             apSouthCluster: { computeLoadPercentage: 0, volatileMemoryAllocationGb: 0, clusterOperationalStatus: 'STABLE' },
         };
         results.forEach((r) => {
-            if (infrastructureState[r._id]) {
-                infrastructureState[r._id] = {
+            const mappedId = r._id === 'US-East' ? 'usEastCluster' 
+                           : r._id === 'EU-West' ? 'euWestCluster'
+                           : r._id === 'AP-South' ? 'apSouthCluster'
+                           : r._id;
+            if (infrastructureState[mappedId]) {
+                infrastructureState[mappedId] = {
                     computeLoadPercentage: r.computeLoadPercentage,
                     volatileMemoryAllocationGb: r.volatileMemoryAllocationGb,
                     clusterOperationalStatus: r.clusterOperationalStatus,

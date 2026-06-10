@@ -4,8 +4,9 @@ import fetch from "node-fetch";
 import fs from "fs";
 import path from "path";
 import { emitArchitecturalThoughtStreamPacket, bootstrapEgressBroadcastServer, writeAiLog, getLiveTelemetry } from "./egressBroadcaster.js";
+let isSystemPaused = false;
 // ─── Environment Validation & Key Pool Initialization ──────────
-const resolvedOrchestratorModel = process.env["AETHERNEXUS_ORCHESTRATOR_MODEL"] ?? "gpt-4o";
+const resolvedOrchestratorModel = process.env["AETHERNEXUS_ORCHESTRATOR_MODEL"] ?? "llama3-8b-8192";
 const resolvedDomain1IngressBaseUrl = process.env["DOMAIN1_TELEMETRY_INGRESS_BASE_URL"] ?? "http://localhost:3001";
 const resolvedPollingIntervalMs = parseInt(process.env["AETHERNEXUS_POLLING_INTERVAL_MS"] ?? "15000", 10);
 const resolvedLlmGatewayBaseUrl = process.env["OPENAI_BASE_URL"] ?? "https://api.groq.com/openai/v1";
@@ -48,13 +49,13 @@ You continuously evaluate live cluster telemetry ingested from the Domain 1 simu
 
 ### Threat Classification Matrix
 - computeLoadPercentage >= 90 OR clusterOperationalStatus === "CRITICAL" → incidentThreatLevel: CRITICAL_RED → Autonomous Action: executeClusterCacheFlush, then requestHumanOverrideClearance
-- computeLoadPercentage >= 70 OR clusterOperationalStatus === "DEGRADED" → incidentThreatLevel: WARNING_AMBER → Autonomous Action: traceRepositoryCommitHistory to correlate recent deployments
-- computeLoadPercentage < 70 AND clusterOperationalStatus === "STABLE" → incidentThreatLevel: NOMINAL_GREEN → Autonomous Action: fetchLiveInfrastructureMetrics (continue passive monitoring)
+- computeLoadPercentage >= 75 OR clusterOperationalStatus === "DEGRADED" → incidentThreatLevel: WARNING_AMBER → Autonomous Action: traceRepositoryCommitHistory to correlate recent deployments
+- computeLoadPercentage < 75 AND clusterOperationalStatus === "STABLE" → incidentThreatLevel: NOMINAL_GREEN → Autonomous Action: fetchLiveInfrastructureMetrics (continue passive monitoring)
 
 ### Execution Constraints
 - You MUST call tools sequentially. Never parallelize destructive operations (cache flushes, override requests).
 - For CRITICAL_RED incidents: always call executeClusterCacheFlush BEFORE requestHumanOverrideClearance.
-- flushOperationAcknowledgementToken must be a newly generated UUIDv4 per incident.
+- flushOperationAcknowledgementToken must be a newly generated 6-character alphanumeric ID per incident.
 - requestingAgentIdentifier must always be "AetherNexus-Core".
 - incidentClassificationCode format: INC-[6 alphanumeric chars] — generate a unique code per incident.
 
@@ -324,6 +325,7 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
                 return JSON.stringify(cacheFlushAcknowledgement);
             }
             case "requestHumanOverrideClearance": {
+                isSystemPaused = true;
                 const overrideClearanceRequest = JSON.parse(toolArgumentsJson);
                 let targetRegion = overrideClearanceRequest.targetClusterRegion || "usEastCluster";
                 if (overrideClearanceRequest.mitigationActionSummary?.includes("euWestCluster")) targetRegion = "euWestCluster";
@@ -471,6 +473,7 @@ async function executeAgenticReasoningCycle(activeConversationThread) {
                 retryCount++;
                 if (retryCount < MAX_RETRIES) {
                     rotateOpenAiKey();
+                    if (mutatingConversationThread[mutatingConversationThread.length - 1]?.role === "system") { mutatingConversationThread.pop(); }
                     continue; // Retry with the new key
                 } else {
                     console.error("[ORCHESTRATOR_AGENTIC_CYCLE_EXCEPTION] All keys exhausted via 429 RateLimitError.", agenticCycleExecutionException);
@@ -487,6 +490,7 @@ async function executeAgenticReasoningCycle(activeConversationThread) {
 // ─── Infrastructure Evaluation Loop (10s polling cadence) ─────────────────────
 console.error("[ORCHESTRATOR_BOOTSTRAP] AetherNexus Autonomous Orchestrator — Evaluation loop initialized.");
 async function executeEvaluationCycle() {
+    if (isSystemPaused) return;
     console.error(`[ORCHESTRATOR_CYCLE_START] Timestamp: ${new Date().toISOString()}`);
         writeAiLog({ text: '[AI] Evaluation cycle started — ingesting live telemetry snapshot.', level: 'info', timestamp: new Date().toISOString(), architect: 'AetherNexus-Core' });
         try {
@@ -540,19 +544,6 @@ ${AUTONOMOUS_CONTROL_PLANE_SYSTEM_PROMPT}`;
                             parsedLlmEgressDirective = JSON.parse(cleanJsonString);
                         } catch(e) {
                             throw new Error("Invalid JSON parsed from LLM");
-                        }
-
-                        const isAllStable = Object.values(currentTelemetrySnapshot).every(c => c.clusterOperationalStatus === "STABLE");
-                        if (isAllStable) {
-                            parsedLlmEgressDirective.incidentThreatLevelColor = "NOMINAL_GREEN";
-                            parsedLlmEgressDirective.trafficDistribution = {
-                                usEastCluster: 0.33,
-                                euWestCluster: 0.33,
-                                apSouthCluster: 0.34
-                            };
-                            try {
-                                await fetch(`${resolvedDomain1IngressBaseUrl}/api/chaos/reset`, { method: "POST" });
-                            } catch(e) {}
                         }
 
                         const architecturalThoughtStreamPacket = {

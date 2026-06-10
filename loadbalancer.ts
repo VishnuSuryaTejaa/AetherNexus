@@ -20,7 +20,7 @@ export function normalizeRegion(region: string): string {
   if (r === 'US-EAST' || r === 'US-EAST-1' || r === 'USEASTCLUSTER') return 'US-East';
   if (r === 'EU-WEST' || r === 'EU-WEST-1' || r === 'EUWESTCLUSTER') return 'EU-West';
   if (r === 'AP-SOUTH' || r === 'AP-SOUTH-1' || r === 'APSOUTHCLUSTER') return 'AP-South';
-  return region;
+  return 'US-East';
 }
 
 /**
@@ -82,11 +82,11 @@ export async function recalculateRouting(db: Db): Promise<TrafficDistributionMap
   } else {
     // All regions are down: fallback to default split to attempt recovery routing
     distributionMap = {
-      'US-East-1': 33.3,
-      'EU-West-1': 33.3,
-      'AP-South-1': 33.4,
+      'US-East-1': 0,
+      'EU-West-1': 0,
+      'AP-South-1': 0,
     };
-    console.log('[loadbalancer] Emergency: All regions down. Fallback to even split.');
+    console.log('[loadbalancer] Emergency: All regions down. Routing dropped to 0%.');
   }
 
   // Save the state directly to database, changing tracking variable called traffic_distribution_map

@@ -10,16 +10,21 @@ export default function Diagnostics({ onReturn, logs, statuses, trafficWeights }
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:4000'}/api/infrastructure/telemetry`)
-      .then(res => res.json())
-      .then(data => {
-        setTelemetry(data);
-        setTimeout(() => setLoading(false), 1500); // Artificial delay for syncing effect
-      })
-      .catch(err => {
-        console.error(err);
-        setLoading(false);
-      });
+    const fetchTelemetry = () => {
+      fetch(`${import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:4000'}/api/infrastructure/telemetry`)
+        .then(res => res.json())
+        .then(data => {
+          setTelemetry(data);
+          setTimeout(() => setLoading(false), 1500); // Artificial delay for syncing effect
+        })
+        .catch(err => {
+          console.error(err);
+          setLoading(false);
+        });
+    };
+    fetchTelemetry();
+    const interval = setInterval(fetchTelemetry, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   let loadData = [];
@@ -74,15 +79,15 @@ export default function Diagnostics({ onReturn, logs, statuses, trafficWeights }
 
   if (trafficWeights) {
     trafficData = [
-      { name: 'US-East', value: trafficWeights.usEastCluster || 33.3 },
-      { name: 'EU-West', value: trafficWeights.euWestCluster || 33.3 },
-      { name: 'AP-South', value: trafficWeights.apSouthCluster || 33.4 },
+      { name: 'US-East', value: trafficWeights.usEastCluster === 0 ? 0.1 : trafficWeights.usEastCluster || 33.3 },
+      { name: 'EU-West', value: trafficWeights.euWestCluster === 0 ? 0.1 : trafficWeights.euWestCluster || 33.3 },
+      { name: 'AP-South', value: trafficWeights.apSouthCluster === 0 ? 0.1 : trafficWeights.apSouthCluster || 33.4 },
     ];
   } else if (telemetry) {
     trafficData = [
-      { name: 'US-East', value: telemetry?.traffic_distribution_map?.['US-East-1'] || 33.3 },
-      { name: 'EU-West', value: telemetry?.traffic_distribution_map?.['EU-West-1'] || 33.3 },
-      { name: 'AP-South', value: telemetry?.traffic_distribution_map?.['AP-South-1'] || 33.3 },
+      { name: 'US-East', value: telemetry?.traffic_distribution_map?.['US-East-1'] === 0 ? 0.1 : telemetry?.traffic_distribution_map?.['US-East-1'] || 33.3 },
+      { name: 'EU-West', value: telemetry?.traffic_distribution_map?.['EU-West-1'] === 0 ? 0.1 : telemetry?.traffic_distribution_map?.['EU-West-1'] || 33.3 },
+      { name: 'AP-South', value: telemetry?.traffic_distribution_map?.['AP-South-1'] === 0 ? 0.1 : telemetry?.traffic_distribution_map?.['AP-South-1'] || 33.3 },
     ];
   }
 
@@ -146,7 +151,7 @@ export default function Diagnostics({ onReturn, logs, statuses, trafficWeights }
               </li>
               <li style={{ borderLeft: `3px solid ${currentThreatColor === 'CRITICAL_RED' ? '#ff3333' : (currentThreatColor === 'WARNING_AMBER' ? '#ffaa00' : '#00ff41')}`, paddingLeft: '15px' }}>
                 <strong style={{ color: currentThreatColor === 'CRITICAL_RED' ? '#ff3333' : (currentThreatColor === 'WARNING_AMBER' ? '#ffaa00' : '#00ff41') }}>[ PREDICTIVE THREAT ANALYSIS ]</strong><br/>
-                Traffic flows suggest standard operational drift. AI prediction model confidence: 94.2%. No immediate manual overrides requested by the Control Plane.
+                {logs?.slice().reverse().find(l => typeof l === 'string' && l.startsWith('[AI')) || "Traffic flows suggest standard operational drift. AI prediction model confidence: 94.2%. No immediate manual overrides requested by the Control Plane."}
               </li>
             </ul>
           </div>
