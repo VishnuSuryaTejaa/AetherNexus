@@ -85,28 +85,7 @@ Live telemetry is provided in the initial user message. Do NOT call 'fetchLiveIn
 `.trim();
 // ─── MCP Tool Manifest (mirrors mcpServer.ts registrations exactly) ───────────
 const aetherNexusMcpToolManifest = [
-    {
-        type: "function",
-        function: {
-            name: "fetchLiveInfrastructureMetrics",
-            description: "Queries real-time multi-region cluster telemetry from the Domain 1 simulation backend. Returns compute load, volatile memory allocation, and operational status per cluster node.",
-            parameters: {
-                type: "object",
-                properties: {
-                    targetClusterRegion: {
-                        type: "string",
-                        description: "Scoped cluster region to query. Omit to retrieve global multi-region snapshot.",
-                    },
-                    telemetrySamplingIntervalMs: {
-                        type: "number",
-                        description: "Polling interval in milliseconds for metric ingestion.",
-                        default: 5000,
-                    },
-                },
-                required: [],
-            },
-        },
-    },
+
     {
         type: "function",
         function: {
@@ -242,19 +221,7 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
     const dispatchedToolName = toolInvocationRequest.function.name;
     try {
         switch (dispatchedToolName) {
-            case "fetchLiveInfrastructureMetrics": {
-                const metricsQueryDirective = JSON.parse(toolArgumentsJson);
-                const regionalTelemetrySnapshot = await simulateDomain1TelemetryIngress();
-                const scopedClusterRegion = metricsQueryDirective.targetClusterRegion;
-                if (scopedClusterRegion) {
-                    return JSON.stringify({
-                        infrastructureState: {
-                            [scopedClusterRegion]: regionalTelemetrySnapshot[scopedClusterRegion],
-                        },
-                    });
-                }
-                return JSON.stringify({ infrastructureState: regionalTelemetrySnapshot });
-            }
+
             case "traceRepositoryCommitHistory": {
                 const commitTraceDirective = JSON.parse(toolArgumentsJson);
                 // [MILESTONE 2.3] — Wire to live VCS API endpoint.
