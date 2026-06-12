@@ -95,7 +95,6 @@ const aetherNexusMcpToolManifest = [
                 properties: {
                     targetClusterRegion: {
                         type: "string",
-                        enum: ["usEastCluster", "euWestCluster", "apSouthCluster"],
                         description: "Scoped cluster region to query. Omit to retrieve global multi-region snapshot.",
                     },
                     telemetrySamplingIntervalMs: {
@@ -144,7 +143,6 @@ const aetherNexusMcpToolManifest = [
                 properties: {
                     targetClusterRegion: {
                         type: "string",
-                        enum: ["usEastCluster", "euWestCluster", "apSouthCluster"],
                         description: "Target cluster region where the cache flush directive will be applied.",
                     },
                     cacheLayerNamespace: {
@@ -209,7 +207,6 @@ const aetherNexusMcpToolManifest = [
                 properties: {
                     targetClusterRegion: {
                         type: "string",
-                        enum: ["usEastCluster", "euWestCluster", "apSouthCluster"],
                         description: "Target cluster region.",
                     }
                 },
