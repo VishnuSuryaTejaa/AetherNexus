@@ -442,7 +442,6 @@ async function executeAgenticReasoningCycle(activeConversationThread) {
                     messages: mutatingConversationThread,
                     tools: aetherNexusMcpToolManifest,
                     tool_choice: "auto",
-                    response_format: { type: "json_object" },
                 });
                 const primaryCompletionChoice = llmCompletionResponse.choices[0];
                 if (!primaryCompletionChoice) {
