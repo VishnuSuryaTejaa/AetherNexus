@@ -8,7 +8,7 @@ let isSystemPaused = false;
 // ─── Environment Validation & Key Pool Initialization ──────────
 const resolvedOrchestratorModel = process.env["AETHERNEXUS_ORCHESTRATOR_MODEL"] ?? "llama3-8b-8192";
 const resolvedDomain1IngressBaseUrl = process.env["DOMAIN1_TELEMETRY_INGRESS_BASE_URL"] ?? "http://localhost:3001";
-const resolvedPollingIntervalMs = parseInt(process.env["AETHERNEXUS_POLLING_INTERVAL_MS"] ?? "15000", 10);
+const resolvedPollingIntervalMs = parseInt(process.env["AETHERNEXUS_POLLING_INTERVAL_MS"] ?? "60000", 10);
 const resolvedLlmGatewayBaseUrl = process.env["OPENAI_BASE_URL"] ?? "https://api.groq.com/openai/v1";
 
 const groqKeyPool = [
@@ -69,6 +69,18 @@ You continuously evaluate live cluster telemetry ingested from the Domain 1 simu
 
 ### Routing Logic
 If a cluster is flagged as CRITICAL_RED, its traffic distribution MUST drop to 0.0. The remaining traffic must be divided equally among the healthy clusters. Once healed (NOMINAL_GREEN), the traffic must return to an even split.
+
+### Egress Format (CRITICAL)
+You MUST output ONLY a valid JSON object. No conversational text.
+{
+  "eventTimestamp": "<iso_date>",
+  "principalArchitect": "AetherNexus-Core",
+  "executedMitigationAction": "<description of action or state>",
+  "incidentThreatLevelColor": "<CRITICAL_RED | WARNING_AMBER | NOMINAL_GREEN>"
+}
+
+### Data Context Rule
+Live telemetry is provided in the initial user message. Do NOT call 'fetchLiveInfrastructureMetrics' unless you require a secondary manual refresh.
 `.trim();
 // ─── MCP Tool Manifest (mirrors mcpServer.ts registrations exactly) ───────────
 const aetherNexusMcpToolManifest = [
@@ -429,6 +441,7 @@ async function executeAgenticReasoningCycle(activeConversationThread) {
                     messages: mutatingConversationThread,
                     tools: aetherNexusMcpToolManifest,
                     tool_choice: "auto",
+                    response_format: { type: "json_object" },
                 });
                 const primaryCompletionChoice = llmCompletionResponse.choices[0];
                 if (!primaryCompletionChoice) {
