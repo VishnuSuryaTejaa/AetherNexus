@@ -87,11 +87,9 @@ export default function ServerRack({ position, label, status, healingProgress })
       ledMeshRef.current.setColorAt(i, sharedColor);
     });
     
-    if (status !== 'NOMINAL_GREEN') {
-      ledMeshRef.current.instanceMatrix.needsUpdate = true;
-      if (ledMeshRef.current.instanceColor) {
-        ledMeshRef.current.instanceColor.needsUpdate = true;
-      }
+    ledMeshRef.current.instanceMatrix.needsUpdate = true;
+    if (ledMeshRef.current.instanceColor) {
+      ledMeshRef.current.instanceColor.needsUpdate = true;
     }
   });
 

@@ -1,6 +1,5 @@
 import { createServer as createHttpServer } from "http";
 import { Server as SocketIoServer } from "socket.io";
-import { MongoClient } from "mongodb";
 
 let db = null;
 
@@ -75,6 +74,14 @@ export function emitArchitecturalThoughtStreamPacket(architecturalThoughtStreamP
             : architecturalThoughtStreamPacket.incidentThreatLevelColor === 'WARNING_AMBER' ? 'warning'
             : architecturalThoughtStreamPacket.incidentThreatLevelColor === 'NOMINAL_GREEN' ? 'success'
             : 'info';
+
+        if (aetherNexusSocketIoEgressServer) {
+            aetherNexusSocketIoEgressServer.emit("ai-log", {
+                text: `[AI] ${architecturalThoughtStreamPacket.executedMitigationAction}`,
+                level
+            });
+        }
+
         writeAiLog({
             text: `[AI] ${architecturalThoughtStreamPacket.executedMitigationAction}`,
             level,
@@ -87,17 +94,7 @@ export function emitArchitecturalThoughtStreamPacket(architecturalThoughtStreamP
     }
 }
 // ─── HTTP Transport Bootstrap ──────────────────────────────────────────────────
-export async function bootstrapEgressBroadcastServer() {
-    if (process.env.MONGODB_URI) {
-        try {
-            const client = new MongoClient(process.env.MONGODB_URI);
-            await client.connect();
-            db = client.db();
-            console.error("[egressBroadcaster] Connected to MongoDB for AI logs and live telemetry");
-        } catch (err) {
-            console.error("[egressBroadcaster] MongoDB connection failed", err);
-            throw err;
-        }
-    }
+export function setSharedDb(databaseInstance) {
+    db = databaseInstance;
 }
 //# sourceMappingURL=egressBroadcaster.js.map

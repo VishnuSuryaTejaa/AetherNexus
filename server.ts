@@ -16,7 +16,7 @@ import {
 // @ts-ignore - Bypassing TS strict mode for compiled JS module
 import { bootOrchestrator } from './dist/orchestrator.js';
 // @ts-ignore - Bypassing TS strict mode for patched JS export
-import { setSharedSocket } from './dist/egressBroadcaster.js';
+import { setSharedSocket, setSharedDb } from './dist/egressBroadcaster.js';
 // Local region type — microservices run as separate processes
 type Region = 'usEastCluster' | 'euWestCluster' | 'apSouthCluster';
 
@@ -103,6 +103,7 @@ async function connectDb() {
     const client = new MongoClient(MONGODB_URI);
     await client.connect();
     db = client.db();
+    setSharedDb(db);
     mongoConnected = true;
     console.log('[server] Connected to MongoDB Atlas successfully.');
     
@@ -116,13 +117,7 @@ async function connectDb() {
     // High-frequency telemetry broadcast loop
     setInterval(async () => {
       try {
-        if (!mongoConnected) {
-          const client = new MongoClient(MONGODB_URI!);
-          await client.connect();
-          db = client.db();
-          mongoConnected = true;
-          console.log('[server] Reconnected to MongoDB Atlas successfully.');
-        }
+        await ensureDbConnection();
         const liveData = await getLatestMetrics();
         if (liveData) io.emit('live-metrics-stream', liveData);
       } catch (err: any) {
@@ -138,8 +133,15 @@ async function connectDb() {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
+async function ensureDbConnection() {
+  if (!mongoConnected) {
+    await connectDb();
+  }
+  return mongoConnected;
+}
+
 async function getLatestMetrics() {
-  if (!mongoConnected) return null;
+  if (!await ensureDbConnection()) return null;
 
   const pipeline = [
     { $sort: { timestamp: -1 } },
@@ -225,7 +227,7 @@ app.post('/api/mitigate', async (req: Request, res: Response) => {
     // Execute mitigation: clear memory arrays, stop math loops, restore network
     await mitigateCluster(targetClusterRegion as Region);
     
-    if (mongoConnected) {
+    if (await ensureDbConnection()) {
       await recalculateRouting(db);
     }
 
@@ -307,16 +309,14 @@ app.post('/api/rebalance', async (req: Request, res: Response) => {
     );
     // Derive the third unaffected region's weight as the 100-sum remainder
     // to guarantee the distribution always sums to exactly 100.
-    let thirdDistKey: keyof typeof updatedDistribution = 'US-East-1';
-    if (sourceDistKey !== 'US-East-1' && targetDistKey !== 'US-East-1') thirdDistKey = 'US-East-1';
-    else if (sourceDistKey !== 'EU-West-1' && targetDistKey !== 'EU-West-1') thirdDistKey = 'EU-West-1';
-    else thirdDistKey = 'AP-South-1';
+    const availableKeys = (Object.keys(updatedDistribution) as Array<keyof typeof updatedDistribution>).filter(k => k !== sourceDistKey && k !== targetDistKey);
+    const thirdDistKey = availableKeys[0];
     const derivedThirdWeight = parseFloat((100 - mutatedSourceWeight - mutatedTargetWeight).toFixed(4));
     updatedDistribution[sourceDistKey] = mutatedSourceWeight;
     updatedDistribution[targetDistKey] = mutatedTargetWeight;
     updatedDistribution[thirdDistKey] = derivedThirdWeight;
 
-    if (mongoConnected) {
+    if (await ensureDbConnection()) {
       await db.collection<any>('load_balancer_state').updateOne(
         { _id: 'current_state' },
         {
@@ -358,20 +358,21 @@ app.post('/api/chaos/inject-fault', async (req: Request, res: Response) => {
   }
 
   try {
-    injectFault(targetClusterRegion as Region, faultType as any);
-    if (mongoConnected) {
-      const metricDoc = {
+    await injectFault(targetClusterRegion as Region, faultType as any);
+    if (await ensureDbConnection()) {
+      let metricDoc: any = {
         timestamp: new Date(),
         region: normalizeRegion(targetClusterRegion),
-        computeLoadPercentage: 98.0,
-        volatileMemoryAllocationGb: 14.0,
-        clusterOperationalStatus: 'CRITICAL',
       };
-      await db.collection<any>('server_health').insertOne(metricDoc);
-
-      if (faultType === 'NETWORK_DROPOUT') {
-        await recalculateRouting(db);
+      if (faultType === 'NETWORK_DROP') {
+        metricDoc = { ...metricDoc, computeLoadPercentage: 0.0, volatileMemoryAllocationGb: 0.0, networkPackets: 0, clusterOperationalStatus: 'CRITICAL_NETWORK_DOWN' };
+      } else if (faultType === 'MODERATE_LOAD') {
+        metricDoc = { ...metricDoc, computeLoadPercentage: 82.0, volatileMemoryAllocationGb: 8.5, clusterOperationalStatus: 'DEGRADED' };
+      } else {
+        metricDoc = { ...metricDoc, computeLoadPercentage: 98.0, volatileMemoryAllocationGb: 14.0, clusterOperationalStatus: 'CRITICAL' };
       }
+      await db.collection<any>('server_health').insertOne(metricDoc);
+      await recalculateRouting(db);
     }
 
     console.log(`[chaos] Fault ${faultType} injected into ${targetClusterRegion}`);
@@ -391,7 +392,7 @@ app.post('/api/chaos/inject-fault', async (req: Request, res: Response) => {
  * and instantly locks that region's CPU tracking variable to 99.8%.
  */
 app.post('/api/chaos/spike-cpu', async (req: Request, res: Response) => {
-  if (!mongoConnected) {
+  if (!await ensureDbConnection()) {
     return res.status(503).json({ error: 'Database connection not ready' });
   }
 
@@ -446,7 +447,7 @@ app.post('/api/chaos/spike-cpu', async (req: Request, res: Response) => {
  * Defaults to "US-East-1" if no region is provided.
  */
 app.post('/api/chaos/kill-network', async (req: Request, res: Response) => {
-  if (!mongoConnected) {
+  if (!await ensureDbConnection()) {
     return res.status(503).json({ error: 'Database connection not ready' });
   }
 
@@ -498,7 +499,7 @@ app.post('/api/chaos/kill-network', async (req: Request, res: Response) => {
  * returning the load balancer back to its normal 33.3% distribution.
  */
 app.post('/api/chaos/reset', async (req: Request, res: Response) => {
-  if (!mongoConnected) {
+  if (!await ensureDbConnection()) {
     return res.status(503).json({ error: 'Database connection not ready' });
   }
 
@@ -539,7 +540,7 @@ app.post('/api/chaos/reset', async (req: Request, res: Response) => {
  * Reads the database and returns the current metric arrays for all three regions.
  */
 app.get('/api/infrastructure/telemetry', async (req: Request, res: Response) => {
-  if (!mongoConnected) {
+  if (!await ensureDbConnection()) {
     return res.status(503).json({ error: 'Database connection not ready' });
   }
 

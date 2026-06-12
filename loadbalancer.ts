@@ -20,7 +20,7 @@ export function normalizeRegion(region: string): string {
   if (r === 'US-EAST' || r === 'US-EAST-1' || r === 'USEASTCLUSTER') return 'US-East';
   if (r === 'EU-WEST' || r === 'EU-WEST-1' || r === 'EUWESTCLUSTER') return 'EU-West';
   if (r === 'AP-SOUTH' || r === 'AP-SOUTH-1' || r === 'APSOUTHCLUSTER') return 'AP-South';
-  return 'US-East';
+  throw new Error(`Unrecognized region identifier: ${region}`);
 }
 
 /**
@@ -72,13 +72,13 @@ export async function recalculateRouting(db: Db): Promise<TrafficDistributionMap
     };
     console.log(`[loadbalancer] Failover: One region down. Active: ${activeRegions.join(', ')}. Split: 50% / 50%.`);
   } else if (activeRegions.length === 1) {
-    // Two regions are down: route max 60% of traffic to the single remaining healthy region
+    // Two regions are down: route max 100% of traffic to the single remaining healthy region
     distributionMap = {
-      'US-East-1': statusMap['US-East'] ? 60 : 0,
-      'EU-West-1': statusMap['EU-West'] ? 60 : 0,
-      'AP-South-1': statusMap['AP-South'] ? 60 : 0,
+      'US-East-1': statusMap['US-East'] ? 100 : 0,
+      'EU-West-1': statusMap['EU-West'] ? 100 : 0,
+      'AP-South-1': statusMap['AP-South'] ? 100 : 0,
     };
-    console.log(`[loadbalancer] Critical Failover: Two regions down. Active: ${activeRegions[0]}. Routing 60% to active region.`);
+    console.log(`[loadbalancer] Critical Failover: Two regions down. Active: ${activeRegions[0]}. Routing 100% to active region.`);
   } else {
     // All regions are down: fallback to default split to attempt recovery routing
     distributionMap = {
@@ -86,7 +86,7 @@ export async function recalculateRouting(db: Db): Promise<TrafficDistributionMap
       'EU-West-1': 0,
       'AP-South-1': 0,
     };
-    console.log('[loadbalancer] Emergency: All regions down. Routing dropped to 0%.');
+    console.log('[loadbalancer] Emergency: All regions down. Routing disabled (0%).');
   }
 
   // Save the state directly to database, changing tracking variable called traffic_distribution_map

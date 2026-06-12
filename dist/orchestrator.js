@@ -6,7 +6,7 @@ import path from "path";
 import { emitArchitecturalThoughtStreamPacket, bootstrapEgressBroadcastServer, writeAiLog, getLiveTelemetry } from "./egressBroadcaster.js";
 let isSystemPaused = false;
 // ─── Environment Validation & Key Pool Initialization ──────────
-const resolvedOrchestratorModel = process.env["AETHERNEXUS_ORCHESTRATOR_MODEL"] ?? "llama3-8b-8192";
+const resolvedOrchestratorModel = process.env["AETHERNEXUS_ORCHESTRATOR_MODEL"] ?? "llama-3.3-70b-versatile";
 const resolvedDomain1IngressBaseUrl = process.env["DOMAIN1_TELEMETRY_INGRESS_BASE_URL"] ?? "http://localhost:3001";
 const resolvedPollingIntervalMs = parseInt(process.env["AETHERNEXUS_POLLING_INTERVAL_MS"] ?? "60000", 10);
 const resolvedLlmGatewayBaseUrl = process.env["OPENAI_BASE_URL"] ?? "https://api.groq.com/openai/v1";
@@ -23,7 +23,7 @@ if (groqKeyPool.length === 0) {
 }
 
 let currentKeyIndex = 0;
-const clusterMitigationCycles = {};
+
 
 let aetherNexusLlmClient = new OpenAI({
     apiKey: groqKeyPool[currentKeyIndex],
@@ -187,12 +187,17 @@ const aetherNexusMcpToolManifest = [
                         type: "string",
                         description: "Canonical identifier of the autonomous agent requesting override.",
                     },
+                    targetClusterRegion: {
+                        type: "string",
+                        description: "Target cluster region requiring human override.",
+                    },
                 },
                 required: [
                     "incidentClassificationCode",
                     "mitigationActionSummary",
                     "autonomousDecisionRiskLevel",
                     "requestingAgentIdentifier",
+                    "targetClusterRegion",
                 ],
             },
         },
@@ -276,9 +281,7 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
             }
             case "executeClusterCacheFlush": {
                 const cacheFlushDirective = JSON.parse(toolArgumentsJson);
-                if (clusterMitigationCycles[cacheFlushDirective.targetClusterRegion] !== undefined) {
-                    clusterMitigationCycles[cacheFlushDirective.targetClusterRegion] = 4;
-                }
+
                 // [LIVE] — Wire to Domain 1 cache invalidation endpoint in production.
                 try {
                     await fetch(`${resolvedDomain1IngressBaseUrl}/api/mitigate`, {
@@ -317,7 +320,7 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
                                 incidentThreatLevelColor: "NOMINAL_GREEN",
                                 healingProgress: null,
                                 targetClusterRegion: cacheFlushDirective.targetClusterRegion,
-                                trafficDistribution: { usEastCluster: 0.33, euWestCluster: 0.33, apSouthCluster: 0.34 }
+                                trafficDistribution: { usEastCluster: 33.3, euWestCluster: 33.3, apSouthCluster: 33.4 }
                             });
                         } else {
                             emitArchitecturalThoughtStreamPacket({
@@ -336,6 +339,7 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
             }
             case "requestHumanOverrideClearance": {
                 isSystemPaused = true;
+                setTimeout(() => { isSystemPaused = false; }, 300000);
                 const overrideClearanceRequest = JSON.parse(toolArgumentsJson);
                 let targetRegion = overrideClearanceRequest.targetClusterRegion || "usEastCluster";
                 if (overrideClearanceRequest.mitigationActionSummary?.includes("euWestCluster")) targetRegion = "euWestCluster";
@@ -365,17 +369,21 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
             }
             case "executeLoadBalancing": {
                 const loadBalanceDirective = JSON.parse(toolArgumentsJson);
-                if (clusterMitigationCycles[loadBalanceDirective.targetClusterRegion] !== undefined) {
-                    clusterMitigationCycles[loadBalanceDirective.targetClusterRegion] = 4;
-                }
+
                 
                 try {
+                    const telemetry = await simulateDomain1TelemetryIngress();
+                    const availableRegions = Object.entries(telemetry)
+                        .filter(([region]) => region !== loadBalanceDirective.targetClusterRegion)
+                        .sort((a, b) => a[1].computeLoadPercentage - b[1].computeLoadPercentage);
+                    const dynamicTargetRegion = availableRegions[0][0];
+
                     await fetch(`${resolvedDomain1IngressBaseUrl}/api/rebalance`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
                             sourceRegion: loadBalanceDirective.targetClusterRegion,
-                            targetRegion: loadBalanceDirective.targetClusterRegion === "euWestCluster" ? "usEastCluster" : "euWestCluster",
+                            targetRegion: dynamicTargetRegion,
                             trafficShiftPercentage: 50
                         })
                     });
@@ -497,7 +505,7 @@ async function executeAgenticReasoningCycle(activeConversationThread) {
     }
     return mutatingConversationThread;
 }
-// ─── Infrastructure Evaluation Loop (10s polling cadence) ─────────────────────
+// ─── Infrastructure Evaluation Loop (60s polling cadence) ─────────────────────
 console.error("[ORCHESTRATOR_BOOTSTRAP] AetherNexus Autonomous Orchestrator — Evaluation loop initialized.");
 async function executeEvaluationCycle() {
     if (isSystemPaused) return;
@@ -565,9 +573,9 @@ ${AUTONOMOUS_CONTROL_PLANE_SYSTEM_PROMPT}`;
                             incidentThreatLevelColor: parsedLlmEgressDirective.incidentThreatLevelColor ??
                                 "NOMINAL_GREEN",
                             trafficDistribution: parsedLlmEgressDirective.trafficDistribution ?? {
-                                usEastCluster: 0.33,
-                                euWestCluster: 0.33,
-                                apSouthCluster: 0.34
+                                usEastCluster: 33.3,
+                                euWestCluster: 33.3,
+                                apSouthCluster: 33.4
                             }
                         };
                         emitArchitecturalThoughtStreamPacket(architecturalThoughtStreamPacket);
@@ -580,9 +588,9 @@ ${AUTONOMOUS_CONTROL_PLANE_SYSTEM_PROMPT}`;
                             executedMitigationAction: "AI output unparseable - Human investigation required",
                             incidentThreatLevelColor: "WARNING_AMBER",
                             trafficDistribution: {
-                                usEastCluster: 0.33,
-                                euWestCluster: 0.33,
-                                apSouthCluster: 0.34
+                                usEastCluster: 33.3,
+                                euWestCluster: 33.3,
+                                apSouthCluster: 33.4
                             }
                         };
                         emitArchitecturalThoughtStreamPacket(nominalCycleBroadcastPacket);
@@ -595,10 +603,18 @@ ${AUTONOMOUS_CONTROL_PLANE_SYSTEM_PROMPT}`;
                         principalArchitect: "AetherNexus-Core",
                         executedMitigationAction: "AI output unparseable - Human investigation required",
                         incidentThreatLevelColor: "WARNING_AMBER",
-                        trafficDistribution: { usEastCluster: 0.33, euWestCluster: 0.33, apSouthCluster: 0.34 }
+                        trafficDistribution: { usEastCluster: 33.3, euWestCluster: 33.3, apSouthCluster: 33.4 }
                     };
                     emitArchitecturalThoughtStreamPacket(nominalCycleBroadcastPacket);
                 }
+            } else {
+                emitArchitecturalThoughtStreamPacket({
+                    eventTimestamp: new Date().toISOString(),
+                    principalArchitect: "AetherNexus-Core",
+                    executedMitigationAction: "AI cycle failed to produce output. Possible schema rejection or step limit reached.",
+                    incidentThreatLevelColor: "WARNING_AMBER",
+                    trafficDistribution: { usEastCluster: 33.3, euWestCluster: 33.3, apSouthCluster: 33.4 }
+                });
             }
         }
         catch (evaluationCycleException) {

@@ -79,15 +79,15 @@ export default function Diagnostics({ onReturn, logs, statuses, trafficWeights }
 
   if (trafficWeights) {
     trafficData = [
-      { name: 'US-East', value: trafficWeights.usEastCluster === 0 ? 0.1 : trafficWeights.usEastCluster || 33.3 },
-      { name: 'EU-West', value: trafficWeights.euWestCluster === 0 ? 0.1 : trafficWeights.euWestCluster || 33.3 },
-      { name: 'AP-South', value: trafficWeights.apSouthCluster === 0 ? 0.1 : trafficWeights.apSouthCluster || 33.4 },
+      { name: 'US-East', value: (trafficWeights.usEastCluster || 0) === 0 ? 0.1 : (trafficWeights.usEastCluster || 33.3) },
+      { name: 'EU-West', value: (trafficWeights.euWestCluster || 0) === 0 ? 0.1 : (trafficWeights.euWestCluster || 33.3) },
+      { name: 'AP-South', value: (trafficWeights.apSouthCluster || 0) === 0 ? 0.1 : (trafficWeights.apSouthCluster || 33.4) },
     ];
   } else if (telemetry) {
     trafficData = [
-      { name: 'US-East', value: telemetry?.traffic_distribution_map?.['US-East-1'] === 0 ? 0.1 : telemetry?.traffic_distribution_map?.['US-East-1'] || 33.3 },
-      { name: 'EU-West', value: telemetry?.traffic_distribution_map?.['EU-West-1'] === 0 ? 0.1 : telemetry?.traffic_distribution_map?.['EU-West-1'] || 33.3 },
-      { name: 'AP-South', value: telemetry?.traffic_distribution_map?.['AP-South-1'] === 0 ? 0.1 : telemetry?.traffic_distribution_map?.['AP-South-1'] || 33.3 },
+      { name: 'US-East', value: (telemetry?.traffic_distribution_map?.['US-East-1'] || 0) === 0 ? 0.1 : (telemetry?.traffic_distribution_map?.['US-East-1'] || 33.3) },
+      { name: 'EU-West', value: (telemetry?.traffic_distribution_map?.['EU-West-1'] || 0) === 0 ? 0.1 : (telemetry?.traffic_distribution_map?.['EU-West-1'] || 33.3) },
+      { name: 'AP-South', value: (telemetry?.traffic_distribution_map?.['AP-South-1'] || 0) === 0 ? 0.1 : (telemetry?.traffic_distribution_map?.['AP-South-1'] || 33.3) },
     ];
   }
 
@@ -176,17 +176,17 @@ export default function Diagnostics({ onReturn, logs, statuses, trafficWeights }
           </div>
           <div>
             <div style={{ color: '#888', fontSize: '14px', marginBottom: '5px' }}>AI Mitigations Executed</div>
-            <div style={{ fontSize: '28px', color: '#00e5ff', fontWeight: 'bold', textShadow: '0 0 10px rgba(0, 229, 255, 0.3)' }}>{logs?.filter(l => l.executedMitigationAction && !l.text).length || 0}</div>
+            <div style={{ fontSize: '28px', color: '#00e5ff', fontWeight: 'bold', textShadow: '0 0 10px rgba(0, 229, 255, 0.3)' }}>{logs?.filter(l => l.executedMitigationAction && !l.text && l.incidentThreatLevelColor === 'CRITICAL_RED').length || 0}</div>
           </div>
         </div>
 
         <div style={{ background: 'rgba(20, 20, 25, 0.65)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0, 255, 65, 0.3)', borderRadius: '8px', padding: '20px', display: 'flex', alignItems: 'center', gap: '20px' }}>
           <div style={{ background: 'rgba(0, 255, 65, 0.1)', padding: '15px', borderRadius: '50%' }}>
-            <ShieldAlert size={32} color={currentThreatColor === 'CRITICAL_RED' ? '#ff3333' : (currentThreatColor === 'WARNING_AMBER' ? '#ffaa00' : '#00ff41')} />
+            <ShieldAlert size={32} color={currentThreatColor === 'CRITICAL_RED' ? '#ff3333' : (currentThreatColor === 'WARNING_AMBER' ? '#ffaa00' : (currentThreatColor === 'HEALING' ? '#ffd700' : '#00ff41'))} />
           </div>
           <div>
             <div style={{ color: '#888', fontSize: '14px', marginBottom: '5px' }}>Active Threat Level</div>
-            <div style={{ fontSize: '28px', color: currentThreatColor === 'CRITICAL_RED' ? '#ff3333' : (currentThreatColor === 'WARNING_AMBER' ? '#ffaa00' : '#00ff41'), fontWeight: 'bold', textShadow: `0 0 10px ${currentThreatColor === 'CRITICAL_RED' ? 'rgba(255, 51, 51, 0.3)' : 'rgba(0, 255, 65, 0.3)'}` }}>{threatDisplay}</div>
+            <div style={{ fontSize: '28px', color: currentThreatColor === 'CRITICAL_RED' ? '#ff3333' : (currentThreatColor === 'WARNING_AMBER' ? '#ffaa00' : (currentThreatColor === 'HEALING' ? '#ffd700' : '#00ff41')), fontWeight: 'bold', textShadow: `0 0 10px ${currentThreatColor === 'CRITICAL_RED' ? 'rgba(255, 51, 51, 0.3)' : (currentThreatColor === 'WARNING_AMBER' ? 'rgba(255, 170, 0, 0.3)' : (currentThreatColor === 'HEALING' ? 'rgba(255, 215, 0, 0.3)' : 'rgba(0, 255, 65, 0.3)'))}` }}>{threatDisplay}</div>
           </div>
         </div>
       </div>
