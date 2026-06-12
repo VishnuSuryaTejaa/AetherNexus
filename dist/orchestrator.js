@@ -91,7 +91,7 @@ const aetherNexusMcpToolManifest = [
         type: "function",
         function: {
             name: "executeClusterCacheFlush",
-            description: "Issues a destructive cache flush directive to a specified cluster region and cache namespace. Requires a pre-authorized acknowledgement token to prevent unintended execution.",
+            description: "Issues a destructive cache flush directive to a specified cluster region and cache namespace. Requires a pre-authorized acknowledgement token to prevent unintended execution. STRICT REQUIREMENT: You are physically forbidden from invoking this tool unless the target cluster's computeLoadPercentage is >= 90 or its status is CRITICAL. Do NOT use if STABLE.",
             parameters: {
                 type: "object",
                 properties: {
@@ -120,7 +120,7 @@ const aetherNexusMcpToolManifest = [
         type: "function",
         function: {
             name: "requestHumanOverrideClearance",
-            description: "Halts autonomous execution and dispatches a structured clearance request to the human-in-the-loop authorization pipeline. Blocks pending action until override token is issued.",
+            description: "Halts autonomous execution and dispatches a structured clearance request to the human-in-the-loop authorization pipeline. Blocks pending action until override token is issued. STRICT REQUIREMENT: You are physically forbidden from invoking this tool unless the target cluster's computeLoadPercentage is >= 90 or its status is CRITICAL. Do NOT use if STABLE.",
             parameters: {
                 type: "object",
                 properties: {
@@ -160,7 +160,7 @@ const aetherNexusMcpToolManifest = [
         type: "function",
         function: {
             name: "executeLoadBalancing",
-            description: "Diverts traffic away from a failing cluster region.",
+            description: "Diverts traffic away from a failing cluster region. STRICT REQUIREMENT: You are physically forbidden from invoking this tool unless the target cluster's computeLoadPercentage is >= 90 or its status is CRITICAL. Do NOT use if STABLE.",
             parameters: {
                 type: "object",
                 properties: {
