@@ -3,7 +3,7 @@ import OpenAI from "openai";
 import fetch from "node-fetch";
 import fs from "fs";
 import path from "path";
-import { emitArchitecturalThoughtStreamPacket, bootstrapEgressBroadcastServer, writeAiLog, getLiveTelemetry } from "./egressBroadcaster.js";
+import { emitArchitecturalThoughtStreamPacket, writeAiLog, getLiveTelemetry } from "./egressBroadcaster.js";
 let isSystemPaused = false;
 // ─── Environment Validation & Key Pool Initialization ──────────
 const resolvedOrchestratorModel = process.env["AETHERNEXUS_ORCHESTRATOR_MODEL"] ?? "llama-3.3-70b-versatile";
@@ -626,7 +626,6 @@ ${AUTONOMOUS_CONTROL_PLANE_SYSTEM_PROMPT}`;
 // ─── Entrypoint Guard ──────────────────────────────────────────────────────────
 export async function bootOrchestrator() {
     console.error("[ORCHESTRATOR_BOOTSTRAP] Engine ignition. AI evaluation loop starting...");
-    await bootstrapEgressBroadcastServer();
     executeEvaluationCycle(); // Run immediately on boot
     setInterval(executeEvaluationCycle, resolvedPollingIntervalMs); // Run every 15 seconds
 }
