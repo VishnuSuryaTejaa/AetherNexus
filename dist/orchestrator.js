@@ -86,32 +86,7 @@ Live telemetry is provided in the initial user message. Do NOT call 'fetchLiveIn
 // ─── MCP Tool Manifest (mirrors mcpServer.ts registrations exactly) ───────────
 const aetherNexusMcpToolManifest = [
 
-    {
-        type: "function",
-        function: {
-            name: "traceRepositoryCommitHistory",
-            description: "Traverses a target repository's commit graph up to a configurable depth, with optional author identity filtering. Used by the orchestration layer for autonomous change correlation.",
-            parameters: {
-                type: "object",
-                properties: {
-                    repositoryNamespace: {
-                        type: "string",
-                        description: "Fully-qualified repository namespace (e.g. 'org/repo-name').",
-                    },
-                    commitLookbackDepth: {
-                        type: "number",
-                        description: "Maximum number of commits to traverse from HEAD.",
-                        default: 50,
-                    },
-                    authorIdentityFilter: {
-                        type: "string",
-                        description: "Optional author email to narrow commit attribution scope.",
-                    },
-                },
-                required: ["repositoryNamespace"],
-            },
-        },
-    },
+
     {
         type: "function",
         function: {
@@ -222,30 +197,7 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
     try {
         switch (dispatchedToolName) {
 
-            case "traceRepositoryCommitHistory": {
-                const commitTraceDirective = JSON.parse(toolArgumentsJson);
-                // [MILESTONE 2.3] — Wire to live VCS API endpoint.
-                const mockedCommitGraphSummary = {
-                    repositoryNamespace: commitTraceDirective.repositoryNamespace,
-                    traversedCommitDepth: commitTraceDirective.commitLookbackDepth ?? 50,
-                    recentCommitRecords: [
-                        {
-                            commitSha: "a3f9c12",
-                            authorIdentity: "aethernexus@aethernexus.io",
-                            commitTimestamp: new Date(Date.now() - 1000 * 60 * 14).toISOString(),
-                            commitMessageSummary: "perf(euWest): increase cache TTL for session-store namespace",
-                        },
-                        {
-                            commitSha: "b7e2d45",
-                            authorIdentity: "aethernexus@aethernexus.io",
-                            commitTimestamp: new Date(Date.now() - 1000 * 60 * 47).toISOString(),
-                            commitMessageSummary: "fix(euWest): patch volatile memory leak in ingress router",
-                        },
-                    ],
-                    authorIdentityFilter: commitTraceDirective.authorIdentityFilter ?? null,
-                };
-                return JSON.stringify(mockedCommitGraphSummary);
-            }
+
             case "executeClusterCacheFlush": {
                 const cacheFlushDirective = JSON.parse(toolArgumentsJson);
 
