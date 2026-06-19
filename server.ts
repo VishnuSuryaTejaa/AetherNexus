@@ -190,7 +190,7 @@ async function getLatestMetrics() {
   return infrastructureState;
 }
 
-// ── Telemetry API (Port 3001 primary endpoint) ──────────────────────────────
+// ── Telemetry API (Port 4000 primary endpoint) ──────────────────────────────
 
 /**
  * GET /api/telemetry
@@ -364,7 +364,7 @@ app.post('/api/chaos/inject-fault', async (req: Request, res: Response) => {
         timestamp: new Date(),
         region: normalizeRegion(targetClusterRegion),
       };
-      if (faultType === 'NETWORK_DROP') {
+      if (faultType === 'NETWORK_DROPOUT') {
         metricDoc = { ...metricDoc, computeLoadPercentage: 0.0, volatileMemoryAllocationGb: 0.0, networkPackets: 0, clusterOperationalStatus: 'CRITICAL_NETWORK_DOWN' };
       } else if (faultType === 'MODERATE_LOAD') {
         metricDoc = { ...metricDoc, computeLoadPercentage: 82.0, volatileMemoryAllocationGb: 8.5, clusterOperationalStatus: 'DEGRADED' };
@@ -401,7 +401,12 @@ app.post('/api/chaos/spike-cpu', async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Missing "region" parameter in request body' });
   }
 
-  const normRegion = normalizeRegion(region);
+  let normRegion;
+  try {
+    normRegion = normalizeRegion(region);
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message });
+  }
 
   try {
     const metricDoc = {
@@ -452,7 +457,13 @@ app.post('/api/chaos/kill-network', async (req: Request, res: Response) => {
   }
 
   const { region = 'US-East-1' } = req.body;
-  const normRegion = normalizeRegion(region);
+  
+  let normRegion;
+  try {
+    normRegion = normalizeRegion(region);
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message });
+  }
 
   try {
     const metricDoc = {

@@ -137,5 +137,11 @@ async function bootstrapAetherNexusControlPlane() {
         process.exit(1);
     }
 }
-bootstrapAetherNexusControlPlane();
+// ─── Main-Module Guard ─────────────────────────────────────────────────────────
+// Only bootstrap the stdio transport when this file is the process entry point.
+// If imported by another module (e.g. server.ts), the bootstrap does NOT run.
+import { pathToFileURL } from "url";
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+    bootstrapAetherNexusControlPlane();
+}
 //# sourceMappingURL=mcpServer.js.map

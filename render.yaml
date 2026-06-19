@@ -11,7 +11,7 @@ services:
     envVars:
       - key: MONGODB_URI
         sync: false
-      - key: GROQ_API_KEY
+      - key: OPENAI_API_KEY
         sync: false
       - key: US_EAST_URL
         sync: false   # Set to Render URL of us-east-cluster after deploy
@@ -19,6 +19,10 @@ services:
         sync: false   # Set to Render URL of eu-west-cluster after deploy
       - key: AP_SOUTH_URL
         sync: false   # Set to Render URL of ap-south-cluster after deploy
+      - key: OPENAI_BASE_URL
+        sync: false
+      - key: DOMAIN1_TELEMETRY_INGRESS_BASE_URL
+        sync: false
 
   # ─── US-East Cluster Microservice ────────────────────────────────────────────
   - type: web
@@ -31,7 +35,7 @@ services:
     envVars:
       - key: MONGODB_URI
         sync: false
-      - key: GROQ_API_KEY
+      - key: OPENAI_API_KEY
         sync: false
 
   # ─── EU-West Cluster Microservice ────────────────────────────────────────────
@@ -45,7 +49,7 @@ services:
     envVars:
       - key: MONGODB_URI
         sync: false
-      - key: GROQ_API_KEY
+      - key: OPENAI_API_KEY
         sync: false
 
   # ─── AP-South Cluster Microservice ───────────────────────────────────────────
@@ -59,5 +63,5 @@ services:
     envVars:
       - key: MONGODB_URI
         sync: false
-      - key: GROQ_API_KEY
+      - key: OPENAI_API_KEY
         sync: false

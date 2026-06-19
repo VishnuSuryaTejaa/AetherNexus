@@ -11,11 +11,15 @@ const app = express();
 const PORT = process.env.GATEWAY_PORT || 3003;
 const MONGODB_URI = process.env.MONGODB_URI;
 
-// Target Node URLs from environment variables
+if (process.env.NODE_ENV === 'production' && (!process.env.US_EAST_URL || !process.env.EU_WEST_URL || !process.env.AP_SOUTH_URL)) {
+  console.error('[gateway] Fatal Error: Missing one or more required cluster URL environment variables (US_EAST_URL, EU_WEST_URL, AP_SOUTH_URL).');
+  process.exit(1);
+}
+
 const NODE_URLS = {
-  'US-East-1': process.env.US_EAST_URL || 'https://oweyr-health-node-us-east.hf.space',
-  'EU-West-1': process.env.EU_WEST_URL || 'https://oweyr-health-node-eu-west.hf.space',
-  'AP-South-1': process.env.AP_SOUTH_URL || 'https://oweyr-health-node-ap-south.hf.space',
+  'US-East-1': process.env.US_EAST_URL || 'http://localhost:3001',
+  'EU-West-1': process.env.EU_WEST_URL || 'http://localhost:3002',
+  'AP-South-1': process.env.AP_SOUTH_URL || 'http://localhost:3004',
 };
 
 interface RoutingTable {
@@ -59,6 +63,19 @@ async function connectDb() {
         routingTable = stateDoc.traffic_distribution_map;
         console.log('[gateway] Initialized routing table from database:', routingTable);
       }
+
+      // Refresh routing table periodically
+      setInterval(async () => {
+        try {
+          const stateDoc = await db.collection<any>('load_balancer_state').findOne({ _id: 'current_state' });
+          if (stateDoc && stateDoc.traffic_distribution_map) {
+            routingTable = stateDoc.traffic_distribution_map;
+          }
+        } catch (err: any) {
+          console.error('[gateway] Failed to refresh routing table:', err.message);
+        }
+      }, 5000);
+
     } catch (err: any) {
       console.warn('[gateway] Database sync failed. Using default in-memory weights:', err.message);
     }
@@ -95,7 +112,7 @@ app.use(cors());
 // ── http-proxy-middleware Gateway Setup ─────────────────────────────────────
 
 const proxyMiddleware = createProxyMiddleware({
-  target: 'https://oweyr-health-node-eu-west.hf.space', // Default fallback target
+  target: NODE_URLS['EU-West-1'] || 'http://localhost:3002', // Default fallback target
   router: (req) => {
     const targetRegion = selectTargetRegion();
     const targetUrl = NODE_URLS[targetRegion];

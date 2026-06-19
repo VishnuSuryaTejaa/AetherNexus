@@ -55,7 +55,10 @@ function stopIntensiveMathLoop() {
 }
 
 app.post('/inject-fault', (req, res) => {
-  const { faultType } = req.body;
+  const { targetClusterRegion, faultType } = req.body;
+  if (targetClusterRegion && targetClusterRegion !== REGION_ID) {
+    return res.status(400).json({ success: false, message: `Ignored: targetClusterRegion ${targetClusterRegion} does not match this node (${REGION_ID})` });
+  }
   if (faultType === 'CPU_SPIKE') {
     faults.cpu = true;
     startIntensiveMathLoop();

@@ -7,7 +7,7 @@ import { emitArchitecturalThoughtStreamPacket, writeAiLog, getLiveTelemetry } fr
 let isSystemPaused = false;
 // ─── Environment Validation & Key Pool Initialization ──────────
 const resolvedOrchestratorModel = process.env["AETHERNEXUS_ORCHESTRATOR_MODEL"] ?? "llama-3.3-70b-versatile";
-const resolvedDomain1IngressBaseUrl = process.env["DOMAIN1_TELEMETRY_INGRESS_BASE_URL"] ?? "http://localhost:3001";
+const resolvedDomain1IngressBaseUrl = process.env["DOMAIN1_TELEMETRY_INGRESS_BASE_URL"] ?? "http://localhost:4000";
 const resolvedPollingIntervalMs = parseInt(process.env["AETHERNEXUS_POLLING_INTERVAL_MS"] ?? "60000", 10);
 const resolvedLlmGatewayBaseUrl = process.env["OPENAI_BASE_URL"] ?? "https://api.groq.com/openai/v1";
 
@@ -160,7 +160,7 @@ const aetherNexusMcpToolManifest = [
         type: "function",
         function: {
             name: "executeLoadBalancing",
-            description: "Diverts traffic away from a failing cluster region. STRICT REQUIREMENT: You are physically forbidden from invoking this tool unless the target cluster's computeLoadPercentage is >= 90 or its status is CRITICAL. Do NOT use if STABLE.",
+            description: "Diverts traffic away from a degraded or overloaded cluster region by redistributing load to healthier regions. STRICT REQUIREMENT: You are physically forbidden from invoking this tool unless the target cluster's computeLoadPercentage is >= 75 or its status is DEGRADED. This is the WARNING_AMBER mitigation action. Do NOT use if STABLE (NOMINAL_GREEN).",
             parameters: {
                 type: "object",
                 properties: {

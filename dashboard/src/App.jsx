@@ -163,6 +163,8 @@ export default function App() {
               const dbStatus = metrics?.clusterOperationalStatus;
               if (dbStatus === 'HEALING') {
                 setStatuses(prev => ({ ...prev, [regionId]: 'HEALING' }));
+              } else if (dbStatus === 'CRITICAL_NETWORK_DOWN' || dbStatus === 'CRITICAL') {
+                setStatuses(prev => ({ ...prev, [regionId]: 'CRITICAL_RED' }));
               } else if (cpu > 90) {
                 setStatuses(prev => ({ ...prev, [regionId]: 'CRITICAL_RED' }));
               } else if (cpu > 75) {
@@ -182,23 +184,17 @@ export default function App() {
         setTrafficWeights(data.trafficDistribution);
       }
 
-      if (data.executedMitigationAction) {
-        let targetId = null;
-        if (data.executedMitigationAction.includes('usEastCluster')) targetId = 'usEastCluster';
-        if (data.executedMitigationAction.includes('euWestCluster')) targetId = 'euWestCluster';
-        if (data.executedMitigationAction.includes('apSouthCluster')) targetId = 'apSouthCluster';
-        
-        if (targetId && data.incidentThreatLevelColor) {
-          setStatuses(prev => ({
+      if (data.targetClusterRegion && data.incidentThreatLevelColor) {
+        const targetId = data.targetClusterRegion;
+        setStatuses(prev => ({
+          ...prev,
+          [targetId]: data.incidentThreatLevelColor
+        }));
+        if (data.healingProgress !== undefined) {
+          setHealingProgresses(prev => ({
             ...prev,
-            [targetId]: data.incidentThreatLevelColor
+            [targetId]: data.healingProgress
           }));
-          if (data.healingProgress !== undefined) {
-            setHealingProgresses(prev => ({
-              ...prev,
-              [targetId]: data.healingProgress
-            }));
-          }
         }
       }
     });
@@ -212,6 +208,8 @@ export default function App() {
         const dbStatus = m?.clusterOperationalStatus;
         if (dbStatus === 'HEALING') {
           setStatuses(prev => ({ ...prev, [regionId]: 'HEALING' }));
+        } else if (dbStatus === 'CRITICAL_NETWORK_DOWN' || dbStatus === 'CRITICAL') {
+          setStatuses(prev => ({ ...prev, [regionId]: 'CRITICAL_RED' }));
         } else if (cpu > 90) {
           setStatuses(prev => ({ ...prev, [regionId]: 'CRITICAL_RED' }));
         } else if (cpu > 75) {
@@ -257,18 +255,16 @@ export default function App() {
         clearInterval(mitigationIntervals.current[region]);
       }
 
-      const interval = setInterval(() => {
+      mitigationIntervals.current[region] = setInterval(() => {
         progress += 1;
         if (progress >= 100) {
-          clearInterval(interval);
+          clearInterval(mitigationIntervals.current[region]);
           setStatuses(prev => ({ ...prev, [region]: 'NOMINAL_GREEN' }));
           setHealingProgresses(prev => ({ ...prev, [region]: null }));
         } else {
           setHealingProgresses(prev => ({ ...prev, [region]: progress }));
         }
       }, 300);
-      
-      mitigationIntervals.current[region] = interval;
     } catch (e) {
       console.error('Manual mitigation failed', e);
       setStatuses(prev => ({ ...prev, [region]: 'CRITICAL_RED' }));

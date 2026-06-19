@@ -144,7 +144,7 @@ export default function Diagnostics({ onReturn, logs, statuses, trafficWeights }
               <li style={{ borderLeft: '3px solid #00e5ff', paddingLeft: '15px' }}>
                 <strong style={{ color: '#00e5ff' }}>[ RECENT MITIGATIONS ]</strong><br/>
                 {logs && logs.length > 0 ? (
-                  logs.slice(-3).map((l, i) => <div key={i}>- {l.executedMitigationAction}</div>)
+                  logs.slice(-3).map((l, i) => <div key={i}>- {typeof l === 'object' && l.executedMitigationAction ? l.executedMitigationAction : (typeof l === 'string' ? l : l.text || '')}</div>)
                 ) : (
                   "No critical mitigations executed in the current session timeframe."
                 )}

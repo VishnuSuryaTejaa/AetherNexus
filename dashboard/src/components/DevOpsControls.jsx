@@ -15,7 +15,7 @@ export default function DevOpsControls({ onMitigate }) {
       await fetch(`${GATEWAY_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetClusterRegion: region })
+        body: JSON.stringify({ region: region })
       });
     } catch (e) {
       console.error('Chaos injection failed', e);

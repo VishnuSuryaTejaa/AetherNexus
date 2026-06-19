@@ -7,7 +7,7 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
-const PORT = process.env.PORT || 3003;
+const PORT = process.env.PORT || 3004;
 const REGION_ID = 'apSouthCluster';
 const REGION_DB_NAME = 'AP-South';
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -55,7 +55,10 @@ function stopIntensiveMathLoop() {
 }
 
 app.post('/inject-fault', (req, res) => {
-  const { faultType } = req.body;
+  const { targetClusterRegion, faultType } = req.body;
+  if (targetClusterRegion && targetClusterRegion !== REGION_ID) {
+    return res.status(400).json({ success: false, message: `Ignored: targetClusterRegion ${targetClusterRegion} does not match this node (${REGION_ID})` });
+  }
   if (faultType === 'CPU_SPIKE') {
     faults.cpu = true;
     startIntensiveMathLoop();
