@@ -4,8 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node app.js",
-    "mcp": "node mcp_server.js",
+    "start": "npx ts-node server.ts",
+    "mcp": "node dist/mcpServer.js",
     "chaos-server": "ts-node server.ts",
     "gateway": "ts-node gateway.ts",
     "start:all": "concurrently \"npx ts-node server.ts\" \"npx ts-node nodes/us-east-node.ts\" \"npx ts-node nodes/eu-west-node.ts\" \"npx ts-node nodes/ap-south-node.ts\" \"cd dashboard && npm run dev\""
