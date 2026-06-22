@@ -36,7 +36,7 @@ const MONGODB_URI = process.env.MONGODB_URI;
 const MICROSERVICE_URLS: Record<string, string> = {
   usEastCluster: process.env.US_EAST_URL || 'http://localhost:3001',
   euWestCluster: process.env.EU_WEST_URL || 'http://localhost:3002',
-  apSouthCluster: process.env.AP_SOUTH_URL || 'http://localhost:3003',
+  apSouthCluster: process.env.AP_SOUTH_URL || 'http://localhost:3004',
 };
 
 // Region name → JSON key mapping (for real data)
