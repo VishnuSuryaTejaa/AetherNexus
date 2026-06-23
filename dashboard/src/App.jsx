@@ -8,7 +8,7 @@ import Diagnostics from './components/Diagnostics';
 import DevOpsControls from './components/DevOpsControls';
 import './App.css';
 
-const GATEWAY_URL = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:4000';
+const GATEWAY_URL = import.meta.env.DOMAIN1_TELEMETRY_INGRESS_BASE_URL || 'http://localhost:4000';
 
 const packetGeo = new THREE.BoxGeometry(0.1, 0.1, 0.1);
 const packetMat = new THREE.MeshBasicMaterial({ color: '#ffffff' });
@@ -42,7 +42,7 @@ function ApiGateway({ position }) {
 
 function DataFlowSystem({ apiGatewayPos, racks, statuses, trafficWeights }) {
   const meshRef = useRef();
-  
+
   const packets = useMemo(() => {
     const arr = [];
     racks.forEach((rack, rackIdx) => {
@@ -64,7 +64,7 @@ function DataFlowSystem({ apiGatewayPos, racks, statuses, trafficWeights }) {
 
   useFrame((state, delta) => {
     if (!meshRef.current) return;
-    
+
     const weights = [
       trafficWeights?.usEastCluster || 0,
       trafficWeights?.euWestCluster || 0,
@@ -77,7 +77,7 @@ function DataFlowSystem({ apiGatewayPos, racks, statuses, trafficWeights }) {
       p.progress += delta * p.speed;
       if (p.progress > 1) {
         p.progress = 0;
-        
+
         if (sum > 0) {
           const rand = Math.random();
           let runningTotal = 0;
@@ -91,9 +91,9 @@ function DataFlowSystem({ apiGatewayPos, racks, statuses, trafficWeights }) {
           }
         }
       }
-      
+
       const targetRack = racks[p.rackIdx];
-      
+
       dummy.position.lerpVectors(
         gatewayVec,
         rackVecs[p.rackIdx],
@@ -101,16 +101,16 @@ function DataFlowSystem({ apiGatewayPos, racks, statuses, trafficWeights }) {
       );
       dummy.updateMatrix();
       meshRef.current.setMatrixAt(i, dummy.matrix);
-      
+
       const status = statuses[targetRack.id] || 'NOMINAL_GREEN';
       if (status === 'CRITICAL_RED') colorObj.set('#ff3333');
       else if (status === 'WARNING_AMBER') colorObj.set('#ffaa00');
       else if (status === 'HEALING') colorObj.set('#ffd700');
       else colorObj.set('#00ff00');
-      
+
       meshRef.current.setColorAt(i, colorObj);
     });
-    
+
     meshRef.current.instanceMatrix.needsUpdate = true;
     if (meshRef.current.instanceColor) meshRef.current.instanceColor.needsUpdate = true;
   });
@@ -123,7 +123,7 @@ function DataFlowSystem({ apiGatewayPos, racks, statuses, trafficWeights }) {
 }
 
 export default function App() {
-  console.log('[DEBUG] Active Gateway URL:', import.meta.env.VITE_API_GATEWAY_URL);
+  console.log('[DEBUG] Active Gateway URL:', import.meta.env.DOMAIN1_TELEMETRY_INGRESS_BASE_URL);
   const [currentView, setCurrentView] = useState('topology');
   const [logs, setLogs] = useState([]);
   const [trafficWeights, setTrafficWeights] = useState({ usEastCluster: 33.3, euWestCluster: 33.3, apSouthCluster: 33.4 });
@@ -180,7 +180,7 @@ export default function App() {
     socket.on('aethernexus-telemetry-broadcast', (data) => {
       // GAP-010 FIX: unified newest-first ordering
       setLogs(prev => [data, ...prev].slice(0, 100));
-      
+
       if (data.trafficDistribution) {
         setTrafficWeights(data.trafficDistribution);
       }
@@ -307,7 +307,7 @@ export default function App() {
       setStatuses(prev => ({ ...prev, [region]: 'HEALING' }));
       setHealingProgresses(prev => ({ ...prev, [region]: 0 }));
       let progress = 0;
-      
+
       if (mitigationIntervals.current[region]) {
         clearInterval(mitigationIntervals.current[region]);
       }
@@ -344,14 +344,14 @@ export default function App() {
           <Canvas camera={{ position: [0, 4, 15], fov: 50 }}>
             <ambientLight intensity={0.5} />
             <pointLight position={[0, 10, 0]} intensity={1.5} color="#ffffff" />
-            
+
             <ApiGateway position={apiGatewayPos} />
-            
+
             {racks.map(rack => (
-              <ServerRack 
-                key={rack.id} 
-                position={rack.position} 
-                label={rack.label} 
+              <ServerRack
+                key={rack.id}
+                position={rack.position}
+                label={rack.label}
                 status={statuses[rack.id]}
                 healingProgress={healingProgresses[rack.id]}
                 metrics={liveMetrics[rack.id]}
@@ -364,20 +364,20 @@ export default function App() {
           </Canvas>
 
           {/* Glassmorphism Sidebar */}
-          <div style={{ 
-            position: 'absolute', 
-            top: 20, 
-            right: 20, 
-            width: 320, 
-            height: 'calc(100% - 40px)', 
-            background: 'rgba(20, 20, 25, 0.65)', 
-            backdropFilter: 'blur(12px)', 
-            border: '1px solid #00e5ff', 
-            borderRadius: 8, 
-            padding: 20, 
-            color: '#fff', 
-            fontFamily: 'monospace', 
-            overflowY: 'hidden', 
+          <div style={{
+            position: 'absolute',
+            top: 20,
+            right: 20,
+            width: 320,
+            height: 'calc(100% - 40px)',
+            background: 'rgba(20, 20, 25, 0.65)',
+            backdropFilter: 'blur(12px)',
+            border: '1px solid #00e5ff',
+            borderRadius: 8,
+            padding: 20,
+            color: '#fff',
+            fontFamily: 'monospace',
+            overflowY: 'hidden',
             boxShadow: '0 0 20px rgba(0, 229, 255, 0.15)',
             boxSizing: 'border-box',
             display: 'flex',
@@ -387,13 +387,13 @@ export default function App() {
               Session: Admin
             </div>
             <h3 style={{ borderBottom: '1px solid rgba(0, 229, 255, 0.3)', paddingBottom: 15, marginTop: 0, letterSpacing: '2px' }}>TELEMETRY LOGS</h3>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flexGrow: 1, overflowY: 'auto' }}>
               {logs.map((log, i) => {
                 const AI_LEVEL_COLORS = { info: '#00e5ff', warning: '#ffaa00', critical: '#ff3333', success: '#00ff41' };
                 const isAiLog = log?.text !== undefined && log?.level !== undefined;
                 const isString = typeof log === 'string';
-                
+
                 let borderColor = '#00ff41';
                 let textColor = '#00ff41';
                 if (isString) {
@@ -415,7 +415,7 @@ export default function App() {
                     {isAiLog ? (
                       <>
                         <div style={{ color: AI_LEVEL_COLORS[log.level] || '#00e5ff', marginBottom: '3px', fontSize: '10px', fontFamily: 'monospace' }}>
-                          { `[${new Date(log.timestamp).toLocaleTimeString()}] <${log.architect}> [${log.level?.toUpperCase()}]` }
+                          {`[${new Date(log.timestamp).toLocaleTimeString()}] <${log.architect}> [${log.level?.toUpperCase()}]`}
                         </div>
                         <div style={{ color: '#e0e0e0', lineHeight: '1.4' }}>{log.text}</div>
                       </>
@@ -439,16 +439,16 @@ export default function App() {
               )}
             </div>
 
-            <button 
+            <button
               onClick={() => setCurrentView('diagnostics')}
-              style={{ 
-                marginTop: '20px', 
-                width: '100%', 
-                padding: '12px', 
-                background: 'transparent', 
-                border: '1px solid #00e5ff', 
-                color: '#00e5ff', 
-                fontFamily: 'monospace', 
+              style={{
+                marginTop: '20px',
+                width: '100%',
+                padding: '12px',
+                background: 'transparent',
+                border: '1px solid #00e5ff',
+                color: '#00e5ff',
+                fontFamily: 'monospace',
                 cursor: 'pointer',
                 borderRadius: '4px',
                 boxShadow: '0 0 10px rgba(0, 229, 255, 0.2)',
