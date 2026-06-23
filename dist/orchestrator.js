@@ -421,6 +421,17 @@ async function executeAgenticReasoningCycle(activeConversationThread) {
                     break;
                 }
                 const assistantReasoningMessage = primaryCompletionChoice.message;
+                
+                // Filter out hallucinated tools
+                if (assistantReasoningMessage.tool_calls) {
+                    assistantReasoningMessage.tool_calls = assistantReasoningMessage.tool_calls.filter(
+                        tc => aetherNexusMcpToolManifest.some(m => m.function.name === tc.function.name)
+                    );
+                    if (assistantReasoningMessage.tool_calls.length === 0) {
+                        delete assistantReasoningMessage.tool_calls;
+                    }
+                }
+                
                 console.error('[DIAGNOSTIC - OPENROUTER RAW RESPONSE]:', JSON.stringify(assistantReasoningMessage, null, 2));
                 openRouterConversationThread.push(assistantReasoningMessage);
                 if (assistantReasoningMessage.tool_calls?.length > 0) {
@@ -495,6 +506,17 @@ async function executeAgenticReasoningCycle(activeConversationThread) {
                     break;
                 }
                 const assistantReasoningMessage = primaryCompletionChoice.message;
+                
+                // Filter out hallucinated tools
+                if (assistantReasoningMessage.tool_calls) {
+                    assistantReasoningMessage.tool_calls = assistantReasoningMessage.tool_calls.filter(
+                        tc => aetherNexusMcpToolManifest.some(m => m.function.name === tc.function.name)
+                    );
+                    if (assistantReasoningMessage.tool_calls.length === 0) {
+                        delete assistantReasoningMessage.tool_calls;
+                    }
+                }
+
                 console.error('[DIAGNOSTIC - LLM RAW RESPONSE]:', JSON.stringify(assistantReasoningMessage, null, 2));
                 mutatingConversationThread.push(assistantReasoningMessage);
                 if (assistantReasoningMessage.tool_calls?.length > 0) {

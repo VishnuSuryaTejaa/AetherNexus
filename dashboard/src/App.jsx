@@ -151,7 +151,7 @@ export default function App() {
   ], []);
 
   useEffect(() => {
-    const socket = io(GATEWAY_URL, { transports: ['websocket'], upgrade: false });
+    const socket = io(GATEWAY_URL);
     socket.on('connect', () => {
       fetch(`${GATEWAY_URL}/api/telemetry`)
         .then(res => res.json())
