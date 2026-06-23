@@ -23,6 +23,14 @@ services:
         sync: false
       - key: DOMAIN1_TELEMETRY_INGRESS_BASE_URL
         sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: GROQ_API_KEY_1
+        sync: false
+      - key: GROQ_API_KEY_2
+        sync: false
+      - key: GROQ_API_KEY_3
+        sync: false
 
   # ─── US-East Cluster Microservice ────────────────────────────────────────────
   - type: web

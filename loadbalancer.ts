@@ -53,40 +53,34 @@ export async function recalculateRouting(db: Db): Promise<TrafficDistributionMap
 
   // Calculate active regions list
   const activeRegions = Object.keys(statusMap).filter(r => statusMap[r]);
-  let distributionMap: TrafficDistributionMap;
+  const regionKeys: Record<string, keyof TrafficDistributionMap> = {
+    'US-East': 'US-East-1',
+    'EU-West': 'EU-West-1',
+    'AP-South': 'AP-South-1',
+  };
 
-  if (activeRegions.length === 3) {
-    // Normal operation: divided evenly among all three regions
-    distributionMap = {
-      'US-East-1': 33.3,
-      'EU-West-1': 33.3,
-      'AP-South-1': 33.4,
-    };
-    console.log('[loadbalancer] All regions healthy. Even split: 33.3, 33.3, 33.4.');
-  } else if (activeRegions.length === 2) {
-    // One region is down: redistribute traffic weight equally between the other two (50% each)
-    distributionMap = {
-      'US-East-1': statusMap['US-East'] ? 50 : 0,
-      'EU-West-1': statusMap['EU-West'] ? 50 : 0,
-      'AP-South-1': statusMap['AP-South'] ? 50 : 0,
-    };
-    console.log(`[loadbalancer] Failover: One region down. Active: ${activeRegions.join(', ')}. Split: 50% / 50%.`);
-  } else if (activeRegions.length === 1) {
-    // Two regions are down: route max 100% of traffic to the single remaining healthy region
-    distributionMap = {
-      'US-East-1': statusMap['US-East'] ? 100 : 0,
-      'EU-West-1': statusMap['EU-West'] ? 100 : 0,
-      'AP-South-1': statusMap['AP-South'] ? 100 : 0,
-    };
-    console.log(`[loadbalancer] Critical Failover: Two regions down. Active: ${activeRegions[0]}. Routing 100% to active region.`);
-  } else {
-    // All regions are down: fallback to default split to attempt recovery routing
-    distributionMap = {
-      'US-East-1': 0,
-      'EU-West-1': 0,
-      'AP-South-1': 0,
-    };
+  let distributionMap: TrafficDistributionMap = {
+    'US-East-1': 0,
+    'EU-West-1': 0,
+    'AP-South-1': 0,
+  };
+
+  if (activeRegions.length === 0) {
+    // All regions down — routing disabled
     console.log('[loadbalancer] Emergency: All regions down. Routing disabled (0%).');
+  } else {
+    // Integer-division algorithm: guarantees sum = exactly 100 with no floating-point drift
+    const healthyCount = activeRegions.length;
+    const baseLoad = Math.floor(100 / healthyCount);
+    let remainder = 100 % healthyCount;
+
+    for (const r of activeRegions) {
+      const distKey = regionKeys[r];
+      distributionMap[distKey] = baseLoad + (remainder > 0 ? 1 : 0);
+      if (remainder > 0) remainder--;
+    }
+
+    console.log(`[loadbalancer] Active regions: ${activeRegions.join(', ')}. Distribution:`, distributionMap);
   }
 
   // Save the state directly to database, changing tracking variable called traffic_distribution_map

@@ -8,8 +8,26 @@ let isSystemPaused = false;
 // ─── Environment Validation & Key Pool Initialization ──────────
 const resolvedOrchestratorModel = process.env["AETHERNEXUS_ORCHESTRATOR_MODEL"] ?? "llama-3.3-70b-versatile";
 const resolvedDomain1IngressBaseUrl = process.env["DOMAIN1_TELEMETRY_INGRESS_BASE_URL"] ?? "http://localhost:4000";
-const resolvedPollingIntervalMs = parseInt(process.env["AETHERNEXUS_POLLING_INTERVAL_MS"] ?? "60000", 10);
+// GAP-006 FIX: Spec mandates 30s polling cadence — default corrected from 60000 to 30000.
+const resolvedPollingIntervalMs = parseInt(process.env["AETHERNEXUS_POLLING_INTERVAL_MS"] ?? "30000", 10);
 const resolvedLlmGatewayBaseUrl = process.env["OPENAI_BASE_URL"] ?? "https://api.groq.com/openai/v1";
+
+// GAP-004 FIX: OpenRouter primary client — spec mandates openai/gpt-oss-120b:free as first engine.
+const resolvedOpenRouterApiKey = process.env["OPENROUTER_API_KEY"] ?? null;
+const openRouterClient = resolvedOpenRouterApiKey
+    ? new OpenAI({
+        baseURL: "https://openrouter.ai/api/v1",
+        apiKey: resolvedOpenRouterApiKey,
+        defaultHeaders: {
+            "HTTP-Referer": "https://aethernexus-gateway.onrender.com",
+            "X-Title": "AetherNexus AI Control Plane",
+        },
+    })
+    : null;
+
+if (!resolvedOpenRouterApiKey) {
+    console.error("[ORCHESTRATOR_ENV_WARN] OPENROUTER_API_KEY not found — OpenRouter primary engine disabled. Falling back to Groq key pool only.");
+}
 
 const groqKeyPool = [
     process.env["OPENAI_API_KEY"],
@@ -17,27 +35,30 @@ const groqKeyPool = [
     process.env["OPENAI_API_KEY3"]
 ].filter((key) => key && key.startsWith("gsk_"));
 
-if (groqKeyPool.length === 0) {
-    console.error("[ORCHESTRATOR_ENV_VALIDATION_EXCEPTION] No valid OPENAI_API_KEYs (gsk_ pattern) found in the runtime environment.");
+if (groqKeyPool.length === 0 && !resolvedOpenRouterApiKey) {
+    console.error("[ORCHESTRATOR_ENV_VALIDATION_EXCEPTION] No valid LLM credentials found (no OPENROUTER_API_KEY and no gsk_ Groq keys). Cannot start.");
     process.exit(1);
 }
 
 let currentKeyIndex = 0;
 
+let aetherNexusLlmClient = groqKeyPool.length > 0
+    ? new OpenAI({
+        apiKey: groqKeyPool[currentKeyIndex],
+        baseURL: resolvedLlmGatewayBaseUrl,
+    })
+    : null;
 
-let aetherNexusLlmClient = new OpenAI({
-    apiKey: groqKeyPool[currentKeyIndex],
-    baseURL: resolvedLlmGatewayBaseUrl,
-});
-
-function rotateOpenAiKey() {
+function rotateGroqKey() {
     currentKeyIndex = (currentKeyIndex + 1) % groqKeyPool.length;
-    console.error(`[ORCHESTRATOR_KEY_ROTATION] TPM limit reached on active key. Rerouting neural pathways to backup key...`);
+    console.error(`[ORCHESTRATOR_KEY_ROTATION] TPM/outage on active key. Rerouting neural pathways to backup Groq key index ${currentKeyIndex}...`);
     aetherNexusLlmClient = new OpenAI({
         apiKey: groqKeyPool[currentKeyIndex],
         baseURL: resolvedLlmGatewayBaseUrl,
     });
 }
+// Back-compat alias used inside executeAgenticReasoningCycle
+const rotateOpenAiKey = rotateGroqKey;
 // ─── SOP System Prompt (sourced from skills.md §3 & §4 + PROJECT_SPECS §1) ────
 const AUTONOMOUS_CONTROL_PLANE_SYSTEM_PROMPT = `
 You are the AetherNexus Autonomous AI Control Plane — a production-grade, self-healing multi-region infrastructure simulation engine.
@@ -349,6 +370,84 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
 // ─── Agentic Tool-Calling Loop ─────────────────────────────────────────────────
 async function executeAgenticReasoningCycle(activeConversationThread) {
     const mutatingConversationThread = [...activeConversationThread];
+
+    // GAP-004 FIX: Try OpenRouter as primary engine first, fall back to Groq key pool.
+    // Phase 1: Attempt with OpenRouter (primary) if configured.
+    if (openRouterClient) {
+        try {
+            let stepCount = 0;
+            const openRouterConversationThread = [...mutatingConversationThread];
+            while (true) {
+                stepCount++;
+                if (stepCount > 5) {
+                    console.error("[ORCHESTRATOR_AGENTIC_CYCLE_EXCEPTION] OpenRouter: Maximum agentic reasoning steps exceeded.");
+                    break;
+                }
+                const llmCompletionResponse = await openRouterClient.chat.completions.create({
+                    model: "openai/gpt-oss-120b:free",
+                    messages: openRouterConversationThread,
+                    tools: aetherNexusMcpToolManifest,
+                    tool_choice: "auto",
+                });
+                const primaryCompletionChoice = llmCompletionResponse.choices[0];
+                if (!primaryCompletionChoice) {
+                    console.error("[ORCHESTRATOR_LLM_COMPLETION_EXCEPTION] OpenRouter returned zero completion choices.");
+                    break;
+                }
+                const assistantReasoningMessage = primaryCompletionChoice.message;
+                console.error('[DIAGNOSTIC - OPENROUTER RAW RESPONSE]:', JSON.stringify(assistantReasoningMessage, null, 2));
+                openRouterConversationThread.push(assistantReasoningMessage);
+                if (primaryCompletionChoice.finish_reason === "stop") {
+                    return openRouterConversationThread; // Success via OpenRouter
+                }
+                if (primaryCompletionChoice.finish_reason === "tool_calls" &&
+                    assistantReasoningMessage.tool_calls) {
+                    for (const pendingToolInvocation of assistantReasoningMessage.tool_calls) {
+                        if (pendingToolInvocation.type === "function") {
+                            console.error(`[ORCHESTRATOR_TOOL_DISPATCH][OpenRouter] Invoking: ${pendingToolInvocation.function.name}`);
+                            writeAiLog({
+                                text: `[AI TOOL][OpenRouter] Invoking ${pendingToolInvocation.function.name}`,
+                                level: pendingToolInvocation.function.name === 'executeClusterCacheFlush' ? 'warning'
+                                     : pendingToolInvocation.function.name === 'requestHumanOverrideClearance' ? 'critical'
+                                     : 'info',
+                                timestamp: new Date().toISOString(),
+                                architect: 'AetherNexus-Core',
+                            });
+                        }
+                        const toolExecutionOutputJson = await dispatchMcpToolCall(pendingToolInvocation);
+                        openRouterConversationThread.push({
+                            role: "tool",
+                            tool_call_id: pendingToolInvocation.id,
+                            content: toolExecutionOutputJson,
+                        });
+                    }
+                    continue;
+                }
+                break;
+            }
+            return openRouterConversationThread;
+        }
+        catch (openRouterException) {
+            // GAP-005 FIX: Rotate on 429 AND 5xx — fall through to Groq pool.
+            const openRouterStatus = openRouterException?.status ?? 0;
+            const shouldFallback = openRouterStatus === 429 ||
+                (openRouterStatus >= 500 && openRouterStatus < 600) ||
+                openRouterException?.code === "rate_limit_exceeded";
+            if (shouldFallback) {
+                console.error(`[ORCHESTRATOR_OPENROUTER_FALLBACK] OpenRouter returned ${openRouterStatus}. Falling back to Groq key pool.`);
+            } else {
+                console.error("[ORCHESTRATOR_OPENROUTER_EXCEPTION] Unexpected OpenRouter error — falling back to Groq.", openRouterException);
+            }
+            // Fall through to Groq pool below
+        }
+    }
+
+    // Phase 2: Groq key pool fallback (also primary when OpenRouter is not configured).
+    if (!aetherNexusLlmClient) {
+        console.error("[ORCHESTRATOR_AGENTIC_CYCLE_EXCEPTION] No LLM client available (OpenRouter failed and no Groq keys).");
+        return mutatingConversationThread;
+    }
+
     let retryCount = 0;
     const MAX_RETRIES = groqKeyPool.length;
 
@@ -403,17 +502,22 @@ async function executeAgenticReasoningCycle(activeConversationThread) {
                 }
                 break;
             }
-            return mutatingConversationThread; // Success
+            return mutatingConversationThread; // Success via Groq
         }
         catch (agenticCycleExecutionException) {
-            if (agenticCycleExecutionException?.status === 429 || agenticCycleExecutionException?.code === "rate_limit_exceeded") {
+            const exceptionStatus = agenticCycleExecutionException?.status ?? 0;
+            // GAP-005 FIX: Rotate on 429 AND 5xx server-side outages (not just 429).
+            const isRotatableError = exceptionStatus === 429 ||
+                (exceptionStatus >= 500 && exceptionStatus < 600) ||
+                agenticCycleExecutionException?.code === "rate_limit_exceeded";
+            if (isRotatableError) {
                 retryCount++;
                 if (retryCount < MAX_RETRIES) {
                     rotateOpenAiKey();
                     if (mutatingConversationThread[mutatingConversationThread.length - 1]?.role === "system") { mutatingConversationThread.pop(); }
-                    continue; // Retry with the new key
+                    continue; // Retry with the next Groq key
                 } else {
-                    console.error("[ORCHESTRATOR_AGENTIC_CYCLE_EXCEPTION] All keys exhausted via 429 RateLimitError.", agenticCycleExecutionException);
+                    console.error("[ORCHESTRATOR_AGENTIC_CYCLE_EXCEPTION] All Groq keys exhausted (429/5xx).", agenticCycleExecutionException);
                     break;
                 }
             } else {

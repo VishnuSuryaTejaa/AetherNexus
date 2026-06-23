@@ -96,16 +96,29 @@ setInterval(async () => {
   if (!faults.cpu && !faults.memory && !faults.network) clusterStatus = 'STABLE';
 
   try {
-    await db.collection('server_health').insertOne({
-      timestamp: new Date(),
-      region: REGION_DB_NAME,
-      computeLoadPercentage: cpuLoad,
-      volatileMemoryAllocationGb: memoryGb,
-      networkPackets: networkPackets,
-      clusterOperationalStatus: clusterStatus,
-    });
+    // GAP-002 + GAP-003: Atomic upsert on node_states with spec-mandated schema
+    await db.collection('node_states').updateOne(
+      { nodeId: REGION_ID },
+      {
+        $set: {
+          nodeId: REGION_ID,
+          status: clusterStatus,
+          currentLoadPercentage: cpuLoad,
+          metrics: {
+            cpu: cpuLoad,
+            ram: memoryGb * 1024,
+            activeConnections: Math.floor(networkPackets / 10),
+            responseTimeMs: Math.floor(10 + Math.random() * 20),
+            timestamp: new Date().toISOString(),
+          },
+          isQuarantined: false,
+          updatedAt: new Date(),
+        },
+      },
+      { upsert: true }
+    );
   } catch (err) {}
-}, 2000);
+}, 10000); // GAP-001: spec mandates 10,000ms (10s) telemetry cadence
 
 connectDb().then(() => {
   app.listen(PORT, () => console.log(`[${REGION_ID}] Listening on port ${PORT}`));

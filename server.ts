@@ -224,11 +224,32 @@ app.post('/api/mitigate', async (req: Request, res: Response) => {
   }
 
   try {
+    // GAP-008: Idempotency guard — suppress duplicate mitigation if node is already HEALING
+    if (await ensureDbConnection()) {
+      const existingNode = await db.collection<any>('node_states').findOne({ nodeId: targetClusterRegion });
+      if (existingNode?.status === 'HEALING' && existingNode?.currentAction === 'CLEAR_CACHE') {
+        console.log(`[mitigate] Duplicate suppressed — ${targetClusterRegion} is already HEALING with CLEAR_CACHE.`);
+        return res.json({ success: true, message: 'Mitigation already running. Duplicate suppressed.' });
+      }
+      // Mark node as HEALING before dispatching so concurrent calls are idempotent
+      await db.collection<any>('node_states').updateOne(
+        { nodeId: targetClusterRegion },
+        { $set: { status: 'HEALING', currentAction: 'CLEAR_CACHE', isQuarantined: false, updatedAt: new Date() } },
+        { upsert: true }
+      );
+    }
+
     // Execute mitigation: clear memory arrays, stop math loops, restore network
     await mitigateCluster(targetClusterRegion as Region);
     
     if (await ensureDbConnection()) {
       await recalculateRouting(db);
+      // Clear HEALING flag after successful mitigation
+      await db.collection<any>('node_states').updateOne(
+        { nodeId: targetClusterRegion },
+        { $set: { status: 'STABLE', currentAction: null, isQuarantined: false, updatedAt: new Date() } },
+        { upsert: true }
+      );
     }
 
     console.log(`[mitigate] Autonomous mitigation executed on ${targetClusterRegion}: ${cacheLayerNamespace}`);
@@ -372,6 +393,12 @@ app.post('/api/chaos/inject-fault', async (req: Request, res: Response) => {
         metricDoc = { ...metricDoc, computeLoadPercentage: 98.0, volatileMemoryAllocationGb: 14.0, clusterOperationalStatus: 'CRITICAL' };
       }
       await db.collection<any>('server_health').insertOne(metricDoc);
+      // GAP-009: Write quarantine lock to node_states
+      await db.collection<any>('node_states').updateOne(
+        { nodeId: targetClusterRegion },
+        { $set: { status: metricDoc.clusterOperationalStatus, isQuarantined: true, updatedAt: new Date() } },
+        { upsert: true }
+      );
       await recalculateRouting(db);
     }
 
@@ -427,6 +454,13 @@ app.post('/api/chaos/spike-cpu', async (req: Request, res: Response) => {
           updatedAt: new Date(),
         },
       },
+      { upsert: true }
+    );
+
+    // GAP-009: Write quarantine lock to node_states
+    await db.collection<any>('node_states').updateOne(
+      { nodeId: normRegion },
+      { $set: { status: 'CRITICAL', isQuarantined: true, updatedAt: new Date() } },
       { upsert: true }
     );
 
@@ -486,6 +520,13 @@ app.post('/api/chaos/kill-network', async (req: Request, res: Response) => {
           updatedAt: new Date(),
         },
       },
+      { upsert: true }
+    );
+
+    // GAP-009: Write quarantine lock to node_states
+    await db.collection<any>('node_states').updateOne(
+      { nodeId: normRegion },
+      { $set: { status: 'CRITICAL_NETWORK_DOWN', isQuarantined: true, updatedAt: new Date() } },
       { upsert: true }
     );
 

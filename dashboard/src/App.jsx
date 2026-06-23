@@ -178,7 +178,8 @@ export default function App() {
     });
 
     socket.on('aethernexus-telemetry-broadcast', (data) => {
-      setLogs(prev => [...prev, data].slice(-100));
+      // GAP-010 FIX: unified newest-first ordering
+      setLogs(prev => [data, ...prev].slice(0, 100));
       
       if (data.trafficDistribution) {
         setTrafficWeights(data.trafficDistribution);
@@ -226,13 +227,68 @@ export default function App() {
     // AI Orchestrator real-time insight stream
     socket.on('ai-log', (data) => {
       const formattedLog = `[AI - ${data.level ? data.level.toUpperCase() : 'INFO'}] ${data.text}`;
-      setLogs(prev => [formattedLog, ...prev].slice(0, 50));
+      setLogs(prev => [formattedLog, ...prev].slice(0, 100));
+    });
+
+    // GAP-011 FIX: handle three canonical WebSocket event types from spec
+    // AE_NODE_ISOLATION — node quarantined; update statuses and traffic weights
+    socket.on('AE_NODE_ISOLATION', (data) => {
+      if (data.nodes && Array.isArray(data.nodes)) {
+        setStatuses(prev => {
+          const next = { ...prev };
+          data.nodes.forEach(n => { if (n.id) next[n.id] = n.colorCode || 'CRITICAL_RED'; });
+          return next;
+        });
+        setTrafficWeights(prev => {
+          const next = { ...prev };
+          data.nodes.forEach(n => { if (n.id && n.load !== undefined) next[n.id] = n.load; });
+          return next;
+        });
+        const isolationLog = { eventTimestamp: new Date().toISOString(), principalArchitect: 'AetherNexus-Core', executedMitigationAction: `Node isolation triggered for: ${data.nodes.map(n => n.id).join(', ')}`, incidentThreatLevelColor: 'CRITICAL_RED' };
+        setLogs(prev => [isolationLog, ...prev].slice(0, 100));
+      }
+    });
+
+    // AE_NODE_HEALING — mitigation started; set target node to HEALING state
+    socket.on('AE_NODE_HEALING', (data) => {
+      if (data.targetNode) {
+        setStatuses(prev => ({ ...prev, [data.targetNode]: 'HEALING' }));
+        setHealingProgresses(prev => ({ ...prev, [data.targetNode]: 0 }));
+        const healingLog = { eventTimestamp: new Date().toISOString(), principalArchitect: 'AetherNexus-Core', executedMitigationAction: `Healing initiated on ${data.targetNode}`, incidentThreatLevelColor: 'HEALING' };
+        setLogs(prev => [healingLog, ...prev].slice(0, 100));
+      }
+    });
+
+    // AE_NETWORK_RESTORED — all nodes healthy; restore statuses and traffic weights
+    socket.on('AE_NETWORK_RESTORED', (data) => {
+      if (data.nodes && Array.isArray(data.nodes)) {
+        setStatuses(prev => {
+          const next = { ...prev };
+          data.nodes.forEach(n => { if (n.id) next[n.id] = n.colorCode || 'NOMINAL_GREEN'; });
+          return next;
+        });
+        setTrafficWeights(prev => {
+          const next = { ...prev };
+          data.nodes.forEach(n => { if (n.id && n.load !== undefined) next[n.id] = n.load; });
+          return next;
+        });
+        setHealingProgresses(prev => {
+          const next = { ...prev };
+          data.nodes.forEach(n => { if (n.id) next[n.id] = null; });
+          return next;
+        });
+        const restoredLog = { eventTimestamp: new Date().toISOString(), principalArchitect: 'AetherNexus-Core', executedMitigationAction: `Network restored. All nodes nominal.`, incidentThreatLevelColor: 'NOMINAL_GREEN' };
+        setLogs(prev => [restoredLog, ...prev].slice(0, 100));
+      }
     });
 
     return () => {
       socket.off('aethernexus-telemetry-broadcast');
       socket.off('live-metrics-stream');
       socket.off('ai-log');
+      socket.off('AE_NODE_ISOLATION');
+      socket.off('AE_NODE_HEALING');
+      socket.off('AE_NETWORK_RESTORED');
       socket.disconnect();
     };
   }, []);
