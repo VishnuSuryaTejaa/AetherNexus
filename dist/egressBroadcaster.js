@@ -59,19 +59,6 @@ export function emitArchitecturalThoughtStreamPacket(architecturalThoughtStreamP
             : architecturalThoughtStreamPacket.incidentThreatLevelColor === 'NOMINAL_GREEN' ? 'success'
             : 'info';
 
-        if (aetherNexusSocketIoEgressServer) {
-            aetherNexusSocketIoEgressServer.emit("ai-log", {
-                text: `[AI] ${architecturalThoughtStreamPacket.executedMitigationAction}`,
-                level
-            });
-        }
-
-        writeAiLog({
-            text: `[AI] ${architecturalThoughtStreamPacket.executedMitigationAction}`,
-            level,
-            timestamp: architecturalThoughtStreamPacket.eventTimestamp ?? new Date().toISOString(),
-            architect: architecturalThoughtStreamPacket.principalArchitect ?? 'AetherNexus-Core',
-        });
     }
     catch (socketBroadcastException) {
         console.error("[SOCKET_BROADCAST_EXCEPTION]", socketBroadcastException);

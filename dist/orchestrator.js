@@ -423,11 +423,7 @@ async function executeAgenticReasoningCycle(activeConversationThread) {
                 const assistantReasoningMessage = primaryCompletionChoice.message;
                 console.error('[DIAGNOSTIC - OPENROUTER RAW RESPONSE]:', JSON.stringify(assistantReasoningMessage, null, 2));
                 openRouterConversationThread.push(assistantReasoningMessage);
-                if (primaryCompletionChoice.finish_reason === "stop") {
-                    return openRouterConversationThread; // Success via OpenRouter
-                }
-                if (primaryCompletionChoice.finish_reason === "tool_calls" &&
-                    assistantReasoningMessage.tool_calls) {
+                if (assistantReasoningMessage.tool_calls?.length > 0) {
                     for (const pendingToolInvocation of assistantReasoningMessage.tool_calls) {
                         if (pendingToolInvocation.type === "function") {
                             console.error(`[ORCHESTRATOR_TOOL_DISPATCH][OpenRouter] Invoking: ${pendingToolInvocation.function.name}`);
@@ -448,8 +444,9 @@ async function executeAgenticReasoningCycle(activeConversationThread) {
                         });
                     }
                     continue;
+                } else {
+                    return openRouterConversationThread; // Success via OpenRouter
                 }
-                break;
             }
             return openRouterConversationThread;
         }
@@ -500,11 +497,7 @@ async function executeAgenticReasoningCycle(activeConversationThread) {
                 const assistantReasoningMessage = primaryCompletionChoice.message;
                 console.error('[DIAGNOSTIC - LLM RAW RESPONSE]:', JSON.stringify(assistantReasoningMessage, null, 2));
                 mutatingConversationThread.push(assistantReasoningMessage);
-                if (primaryCompletionChoice.finish_reason === "stop") {
-                    break;
-                }
-                if (primaryCompletionChoice.finish_reason === "tool_calls" &&
-                    assistantReasoningMessage.tool_calls) {
+                if (assistantReasoningMessage.tool_calls?.length > 0) {
                     for (const pendingToolInvocation of assistantReasoningMessage.tool_calls) {
                         if (pendingToolInvocation.type === "function") {
                             console.error(`[ORCHESTRATOR_TOOL_DISPATCH] Invoking: ${pendingToolInvocation.function.name} | Args: ${pendingToolInvocation.function.arguments}`);
@@ -525,8 +518,9 @@ async function executeAgenticReasoningCycle(activeConversationThread) {
                         });
                     }
                     continue;
+                } else {
+                    return mutatingConversationThread; // Success via Groq
                 }
-                break;
             }
             return mutatingConversationThread; // Success via Groq
         }

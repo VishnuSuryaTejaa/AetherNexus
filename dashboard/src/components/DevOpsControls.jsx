@@ -1,6 +1,6 @@
 import React from 'react';
 
-const GATEWAY_URL = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:4000';
+const GATEWAY_URL = import.meta.env.DOMAIN1_TELEMETRY_INGRESS_BASE_URL || 'http://localhost:4000';
 
 const clusters = [
   { id: 'usEastCluster', label: 'US-East' },

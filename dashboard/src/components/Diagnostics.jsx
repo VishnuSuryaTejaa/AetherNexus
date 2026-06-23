@@ -11,7 +11,7 @@ export default function Diagnostics({ onReturn, logs, statuses, trafficWeights }
 
   useEffect(() => {
     const fetchTelemetry = () => {
-      fetch(`${import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:4000'}/api/infrastructure/telemetry`)
+      fetch(`${import.meta.env.DOMAIN1_TELEMETRY_INGRESS_BASE_URL || 'http://localhost:4000'}/api/infrastructure/telemetry`)
         .then(res => res.json())
         .then(data => {
           setTelemetry(data);
@@ -98,7 +98,7 @@ export default function Diagnostics({ onReturn, logs, statuses, trafficWeights }
 
   return (
     <div style={{
-      width: '100%', minHeight: '100%', background: '#0a0a0a', 
+      width: '100%', minHeight: '100%', background: '#0a0a0a',
       color: '#fff', fontFamily: 'monospace', padding: '40px', boxSizing: 'border-box',
       overflowY: 'auto', position: 'absolute', top: 0, left: 0, zIndex: 10
     }}>
@@ -109,7 +109,7 @@ export default function Diagnostics({ onReturn, logs, statuses, trafficWeights }
         <h1 style={{ margin: 0, color: '#00e5ff', letterSpacing: '2px', textShadow: '0 0 10px rgba(0, 229, 255, 0.5)' }}>
           AETHERNEXUS // DIAGNOSTICS
         </h1>
-        <button 
+        <button
           onClick={onReturn}
           style={{
             background: 'rgba(0, 229, 255, 0.1)', border: '1px solid #00e5ff', color: '#00e5ff',
@@ -138,11 +138,11 @@ export default function Diagnostics({ onReturn, logs, statuses, trafficWeights }
           <div style={{ color: '#e0e0e0', lineHeight: '1.6', fontSize: '15px' }}>
             <ul style={{ listStyleType: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '15px' }}>
               <li style={{ borderLeft: '3px solid #00ff41', paddingLeft: '15px' }}>
-                <strong style={{ color: '#00ff41' }}>[ KEY SYSTEM INSIGHTS ]</strong><br/>
-                Global telemetry indicates the AetherNexus cluster is currently processing at an aggregate load matching <span style={{color: '#00e5ff'}}>{threatDisplay}</span> parameters. Regional balancing logic is active.
+                <strong style={{ color: '#00ff41' }}>[ KEY SYSTEM INSIGHTS ]</strong><br />
+                Global telemetry indicates the AetherNexus cluster is currently processing at an aggregate load matching <span style={{ color: '#00e5ff' }}>{threatDisplay}</span> parameters. Regional balancing logic is active.
               </li>
               <li style={{ borderLeft: '3px solid #00e5ff', paddingLeft: '15px' }}>
-                <strong style={{ color: '#00e5ff' }}>[ RECENT MITIGATIONS ]</strong><br/>
+                <strong style={{ color: '#00e5ff' }}>[ RECENT MITIGATIONS ]</strong><br />
                 {logs && logs.length > 0 ? (
                   logs.slice(-3).map((l, i) => <div key={i}>- {typeof l === 'object' && l.executedMitigationAction ? l.executedMitigationAction : (typeof l === 'string' ? l : l.text || '')}</div>)
                 ) : (
@@ -150,7 +150,7 @@ export default function Diagnostics({ onReturn, logs, statuses, trafficWeights }
                 )}
               </li>
               <li style={{ borderLeft: `3px solid ${currentThreatColor === 'CRITICAL_RED' ? '#ff3333' : (currentThreatColor === 'WARNING_AMBER' ? '#ffaa00' : '#00ff41')}`, paddingLeft: '15px' }}>
-                <strong style={{ color: currentThreatColor === 'CRITICAL_RED' ? '#ff3333' : (currentThreatColor === 'WARNING_AMBER' ? '#ffaa00' : '#00ff41') }}>[ PREDICTIVE THREAT ANALYSIS ]</strong><br/>
+                <strong style={{ color: currentThreatColor === 'CRITICAL_RED' ? '#ff3333' : (currentThreatColor === 'WARNING_AMBER' ? '#ffaa00' : '#00ff41') }}>[ PREDICTIVE THREAT ANALYSIS ]</strong><br />
                 {logs?.slice().reverse().find(l => typeof l === 'string' && l.startsWith('[AI')) || "Traffic flows suggest standard operational drift. AI prediction model confidence: 94.2%. No immediate manual overrides requested by the Control Plane."}
               </li>
             </ul>
@@ -200,22 +200,22 @@ export default function Diagnostics({ onReturn, logs, statuses, trafficWeights }
               <AreaChart data={loadData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorUs" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={COLORS[0]} stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor={COLORS[0]} stopOpacity={0}/>
+                    <stop offset="5%" stopColor={COLORS[0]} stopOpacity={0.8} />
+                    <stop offset="95%" stopColor={COLORS[0]} stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="colorEu" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={COLORS[1]} stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor={COLORS[1]} stopOpacity={0}/>
+                    <stop offset="5%" stopColor={COLORS[1]} stopOpacity={0.8} />
+                    <stop offset="95%" stopColor={COLORS[1]} stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="colorAp" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={COLORS[2]} stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor={COLORS[2]} stopOpacity={0}/>
+                    <stop offset="5%" stopColor={COLORS[2]} stopOpacity={0.8} />
+                    <stop offset="95%" stopColor={COLORS[2]} stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(0, 229, 255, 0.1)" vertical={false} />
-                <XAxis dataKey="time" stroke="rgba(0, 229, 255, 0.3)" tick={{fill: '#666'}} />
-                <YAxis stroke="rgba(0, 229, 255, 0.3)" tick={{fill: '#666'}} />
-                <Tooltip 
+                <XAxis dataKey="time" stroke="rgba(0, 229, 255, 0.3)" tick={{ fill: '#666' }} />
+                <YAxis stroke="rgba(0, 229, 255, 0.3)" tick={{ fill: '#666' }} />
+                <Tooltip
                   contentStyle={{ backgroundColor: 'rgba(10, 10, 10, 0.9)', border: '1px solid #00e5ff', borderRadius: '4px' }}
                   itemStyle={{ color: '#fff' }}
                 />
@@ -262,11 +262,11 @@ export default function Diagnostics({ onReturn, logs, statuses, trafficWeights }
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={incidentData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(0, 229, 255, 0.1)" vertical={false} />
-              <XAxis dataKey="region" stroke="rgba(0, 229, 255, 0.3)" tick={{fill: '#666'}} />
-              <YAxis stroke="rgba(0, 229, 255, 0.3)" tick={{fill: '#666'}} />
-              <Tooltip 
+              <XAxis dataKey="region" stroke="rgba(0, 229, 255, 0.3)" tick={{ fill: '#666' }} />
+              <YAxis stroke="rgba(0, 229, 255, 0.3)" tick={{ fill: '#666' }} />
+              <Tooltip
                 contentStyle={{ backgroundColor: 'rgba(10, 10, 10, 0.9)', border: '1px solid #00e5ff', borderRadius: '4px' }}
-                cursor={{fill: 'rgba(0, 229, 255, 0.05)'}}
+                cursor={{ fill: 'rgba(0, 229, 255, 0.05)' }}
                 itemStyle={{ color: '#fff' }}
               />
               <Legend />
