@@ -8,7 +8,7 @@ import Diagnostics from './components/Diagnostics';
 import DevOpsControls from './components/DevOpsControls';
 import './App.css';
 
-const GATEWAY_URL = import.meta.env.DOMAIN1_TELEMETRY_INGRESS_BASE_URL || 'http://localhost:4000';
+const GATEWAY_URL = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:4000';
 
 const packetGeo = new THREE.BoxGeometry(0.1, 0.1, 0.1);
 const packetMat = new THREE.MeshBasicMaterial({ color: '#ffffff' });
@@ -123,7 +123,7 @@ function DataFlowSystem({ apiGatewayPos, racks, statuses, trafficWeights }) {
 }
 
 export default function App() {
-  console.log('[DEBUG] Active Gateway URL:', import.meta.env.DOMAIN1_TELEMETRY_INGRESS_BASE_URL);
+  console.log('[DEBUG] Active Gateway URL:', import.meta.env.VITE_API_GATEWAY_URL);
   const [currentView, setCurrentView] = useState('topology');
   const [logs, setLogs] = useState([]);
   const [trafficWeights, setTrafficWeights] = useState({ usEastCluster: 33.3, euWestCluster: 33.3, apSouthCluster: 33.4 });
