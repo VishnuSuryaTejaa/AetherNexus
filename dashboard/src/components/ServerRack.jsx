@@ -25,11 +25,12 @@ const bladeMat = new THREE.MeshStandardMaterial({
 // 4. The Glowing Orbs (LEDs)
 const ledsPerBlade = 4;
 const totalLEDs = numBlades * ledsPerBlade;
-const ledGeo = new THREE.SphereGeometry(0.035, 16, 16); // Tiny spheres instead of boxes
-const ledMat = new THREE.MeshStandardMaterial({
-  color: '#ffffff',
-  emissive: '#ffffff', // Emissive makes it act like a real lightbulb!
-  emissiveIntensity: 2.5,
+const ledGeo = new THREE.SphereGeometry(0.035, 16, 16);
+
+// ATOMIC FIX: Switched from MeshStandardMaterial to MeshBasicMaterial.
+// This ignores shadows and guarantees the LED sphere acts like pure light.
+const ledMat = new THREE.MeshBasicMaterial({
+  color: '#ffffff', // This will be immediately overwritten by the useFrame loop
 });
 
 const sharedColor = new THREE.Color();
@@ -37,11 +38,12 @@ const sharedColor = new THREE.Color();
 export default function ServerRack({ position, label, status, healingProgress }) {
   const ledMeshRef = useRef();
 
+  // ATOMIC FIX: Updated to ultra-bright neon hex codes so they pop perfectly.
   const colorMap = useMemo(() => ({
-    NOMINAL_GREEN: { base: new THREE.Color('#00ff41'), dim: new THREE.Color('#002208') },
-    WARNING_AMBER: { base: new THREE.Color('#ffb000'), dim: new THREE.Color('#331a00') },
-    CRITICAL_RED: { base: new THREE.Color('#ff003c'), dim: new THREE.Color('#220000') },
-    HEALING: { base: new THREE.Color('#00e5ff'), dim: new THREE.Color('#003344') },
+    NOMINAL_GREEN: { base: new THREE.Color('#00ff00'), dim: new THREE.Color('#002200') },
+    WARNING_AMBER: { base: new THREE.Color('#ffaa00'), dim: new THREE.Color('#331a00') },
+    CRITICAL_RED: { base: new THREE.Color('#ff0000'), dim: new THREE.Color('#220000') },
+    HEALING: { base: new THREE.Color('#00ffff'), dim: new THREE.Color('#003344') },
   }), []);
 
   const currentColors = colorMap[status] || colorMap.NOMINAL_GREEN;
@@ -82,6 +84,8 @@ export default function ServerRack({ position, label, status, healingProgress })
       ledMeshRef.current.setMatrixAt(i, led.matrix);
       const blink = Math.sin(time * led.blinkSpeed * speedMultiplier + led.blinkOffset);
 
+      // The material is now Basic, so this setColorAt command is all you need 
+      // to change the total color of the orb.
       if (blink > 0) {
         sharedColor.copy(currentColors.base);
       } else {
@@ -99,15 +103,13 @@ export default function ServerRack({ position, label, status, healingProgress })
   return (
     <group position={position}>
 
-      {/* ATOMIC CHANGE 1: The Glass Display Case */}
+      {/* The Glass Display Case */}
       <mesh geometry={frameGeo}>
-        {/* We make the box black, but highly transparent so you can see inside */}
         <meshStandardMaterial color="#000000" transparent opacity={0.15} depthWrite={false} />
-        {/* We wrap the box in a wireframe Edge helper to get that crisp grey outline */}
         <Edges scale={1} threshold={15} color="#555555" />
       </mesh>
 
-      {/* ATOMIC CHANGE 2: The Thick Solid Blades */}
+      {/* The Thick Solid Blades */}
       {Array.from({ length: numBlades }).map((_, i) => {
         const spacing = rackHeight / numBlades;
         const y = (rackHeight / 2) - (spacing / 2) - (i * spacing);
@@ -121,11 +123,12 @@ export default function ServerRack({ position, label, status, healingProgress })
         );
       })}
 
-      {/* ATOMIC CHANGE 3: The Glowing Orbs */}
+      {/* The Glowing Orbs */}
       <instancedMesh ref={ledMeshRef} args={[ledGeo, ledMat, totalLEDs]}>
         <instancedBufferAttribute attach="instanceColor" args={[new Float32Array(totalLEDs * 3), 3]} />
       </instancedMesh>
 
+      {/* Holographic Text Output */}
       <Html center position={[0, -3.2, 0]}>
         <div style={{
           color: currentColors.base.getStyle(),
