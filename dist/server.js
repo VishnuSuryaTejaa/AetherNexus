@@ -5,20 +5,32 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
+const http_1 = __importDefault(require("http"));
+const socket_io_1 = require("socket.io");
 const mongodb_1 = require("mongodb");
 const dotenv_1 = __importDefault(require("dotenv"));
 const node_fetch_1 = __importDefault(require("node-fetch"));
+// NOTE: mcpServer.js is deprecated. The system utilizes the inline dispatchMcpToolCall in orchestrator.js for tool execution.
 const loadbalancer_1 = require("./loadbalancer");
+// @ts-ignore - Bypassing TS strict mode for compiled JS module
+const orchestrator_js_1 = require("./dist/orchestrator.js");
+// @ts-ignore - Bypassing TS strict mode for patched JS export
+const egressBroadcaster_js_1 = require("./dist/egressBroadcaster.js");
 // Load environment variables
 dotenv_1.default.config();
 const app = (0, express_1.default)();
-const PORT = process.env.LOCAL_PORT || process.env.PORT || 3001;
+const httpServer = http_1.default.createServer(app);
+const io = new socket_io_1.Server(httpServer, {
+    cors: { origin: '*', methods: ['GET', 'POST'] },
+});
+(0, egressBroadcaster_js_1.setSharedSocket)(io);
+const PORT = process.env.PORT || 4000;
 const MONGODB_URI = process.env.MONGODB_URI;
-// Deployed health node URLs
-const NODE_URLS = {
-    usEastCluster: process.env.NODE_US_URL || 'https://oweyr-health-node-us-east.hf.space',
-    euWestCluster: process.env.NODE_EU_URL || 'https://oweyr-health-node-eu-west.hf.space',
-    apSouthCluster: process.env.NODE_ASIA_URL || 'https://oweyr-health-node-ap-south.hf.space',
+// Microservice URLs — driven by environment variables for production (Render)
+const MICROSERVICE_URLS = {
+    usEastCluster: process.env.US_EAST_URL || 'http://localhost:3001',
+    euWestCluster: process.env.EU_WEST_URL || 'http://localhost:3002',
+    apSouthCluster: process.env.AP_SOUTH_URL || 'http://localhost:3004',
 };
 // Region name → JSON key mapping (for real data)
 const REGION_TO_KEY = {
@@ -32,7 +44,39 @@ const CLUSTER_ID_TO_REGION = {
     euWestCluster: 'EU-West',
     apSouthCluster: 'AP-South',
 };
-app.use((0, cors_1.default)());
+// ── DISTRIBUTED NETWORK BRIDGES ──────────────────────────────────────────
+// These functions replace the old local clusterManager. 
+// They convert internal gateway commands into physical HTTP network requests sent across the globe.
+async function mitigateCluster(region) {
+    const targetUrl = MICROSERVICE_URLS[region];
+    console.log(`[Gateway] Routing mitigation command across the internet to ${targetUrl}`);
+    try {
+        await (0, node_fetch_1.default)(`${targetUrl}/mitigate`, { method: 'POST' });
+    }
+    catch (err) {
+        console.error(`[Gateway] Failed to reach ${region} at ${targetUrl}`);
+    }
+}
+async function injectFault(region, faultType) {
+    const targetUrl = MICROSERVICE_URLS[region];
+    console.log(`[Gateway] Routing chaos command across the internet to ${targetUrl}`);
+    try {
+        await (0, node_fetch_1.default)(`${targetUrl}/inject-fault`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ targetClusterRegion: region, faultType })
+        });
+    }
+    catch (err) {
+        console.error(`[Gateway] Failed to reach ${region} at ${targetUrl}`);
+    }
+}
+// ─────────────────────────────────────────────────────────────────────────
+app.use((0, cors_1.default)({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+}));
 app.use(express_1.default.json());
 let db;
 let mongoConnected = false;
@@ -46,10 +90,27 @@ async function connectDb() {
         const client = new mongodb_1.MongoClient(MONGODB_URI);
         await client.connect();
         db = client.db();
+        (0, egressBroadcaster_js_1.setSharedDb)(db);
         mongoConnected = true;
         console.log('[server] Connected to MongoDB Atlas successfully.');
         // Initialize the routing table on startup
         await (0, loadbalancer_1.recalculateRouting)(db);
+        // Boot the AI evaluation engine inside the main process
+        await (0, orchestrator_js_1.bootOrchestrator)();
+        console.log('[server] AI Orchestrator engine initialized and running.');
+        // High-frequency telemetry broadcast loop
+        setInterval(async () => {
+            try {
+                await ensureDbConnection();
+                const liveData = await getLatestMetrics();
+                if (liveData)
+                    io.emit('live-metrics-stream', liveData);
+            }
+            catch (err) {
+                mongoConnected = false;
+                console.error('[Socket] Broadcast error:', err.message);
+            }
+        }, 2000);
     }
     catch (err) {
         console.error('[server] MongoDB connection failed:', err.message);
@@ -57,52 +118,38 @@ async function connectDb() {
     }
 }
 // ── Helpers ─────────────────────────────────────────────────────────────────
+async function ensureDbConnection() {
+    if (!mongoConnected) {
+        await connectDb();
+    }
+    return mongoConnected;
+}
 async function getLatestMetrics() {
-    if (!mongoConnected)
+    if (!await ensureDbConnection())
         return null;
-    const pipeline = [
-        { $sort: { timestamp: -1 } },
-        {
-            $group: {
-                _id: '$region',
-                computeLoadPercentage: { $first: '$computeLoadPercentage' },
-                volatileMemoryAllocationGb: { $first: '$volatileMemoryAllocationGb' },
-                clusterOperationalStatus: { $first: '$clusterOperationalStatus' },
-                timestamp: { $first: '$timestamp' },
-            },
-        },
-    ];
-    const results = await db.collection('server_health').aggregate(pipeline).toArray();
+    const results = await db.collection('node_states').find({}).toArray();
     const infrastructureState = {
-        usEastCluster: {
-            computeLoadPercentage: 0,
-            volatileMemoryAllocationGb: 0,
-            clusterOperationalStatus: 'STABLE',
-        },
-        euWestCluster: {
-            computeLoadPercentage: 0,
-            volatileMemoryAllocationGb: 0,
-            clusterOperationalStatus: 'STABLE',
-        },
-        apSouthCluster: {
-            computeLoadPercentage: 0,
-            volatileMemoryAllocationGb: 0,
-            clusterOperationalStatus: 'STABLE',
-        },
+        usEastCluster: { currentLoadPercentage: 0, metrics: { ram: 0 }, status: 'STABLE' },
+        euWestCluster: { currentLoadPercentage: 0, metrics: { ram: 0 }, status: 'STABLE' },
+        apSouthCluster: { currentLoadPercentage: 0, metrics: { ram: 0 }, status: 'STABLE' },
     };
     for (const doc of results) {
-        const key = REGION_TO_KEY[doc._id];
+        const key = doc.nodeId;
         if (key && infrastructureState[key]) {
             infrastructureState[key] = {
-                computeLoadPercentage: doc.computeLoadPercentage,
-                volatileMemoryAllocationGb: doc.volatileMemoryAllocationGb,
-                clusterOperationalStatus: doc.clusterOperationalStatus,
+                currentLoadPercentage: doc.currentLoadPercentage,
+                metrics: doc.metrics,
+                status: doc.status,
+                // BACKWARDS COMPATIBILITY FOR CACHED APP.JSX:
+                computeLoadPercentage: doc.currentLoadPercentage,
+                volatileMemoryAllocationGb: (doc.metrics?.ram || 0) / 1024,
+                clusterOperationalStatus: doc.status
             };
         }
     }
     return infrastructureState;
 }
-// ── Telemetry API (Port 3001 primary endpoint) ──────────────────────────────
+// ── Telemetry API (Port 4000 primary endpoint) ──────────────────────────────
 /**
  * GET /api/telemetry
  * Returns real telemetry states in the exact JSON format expected by the AI.
@@ -132,28 +179,39 @@ app.post('/api/mitigate', async (req, res) => {
             message: 'Missing targetClusterRegion or cacheLayerNamespace',
         });
     }
-    const nodeUrl = NODE_URLS[targetClusterRegion];
-    if (!nodeUrl) {
-        return res.status(400).json({
-            success: false,
-            message: `Unknown region: ${targetClusterRegion}. Valid: usEastCluster, euWestCluster, apSouthCluster`,
-        });
-    }
     try {
-        const response = await (0, node_fetch_1.default)(`${nodeUrl}/api/flush-cache`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cacheLayerNamespace }),
+        // Fix name mapping
+        let clusterId = targetClusterRegion;
+        if (clusterId === 'US-East' || clusterId === 'US-East-1')
+            clusterId = 'usEastCluster';
+        if (clusterId === 'EU-West' || clusterId === 'EU-West-1')
+            clusterId = 'euWestCluster';
+        if (clusterId === 'AP-South' || clusterId === 'AP-South-1')
+            clusterId = 'apSouthCluster';
+        if (await ensureDbConnection()) {
+            const existingNode = await db.collection('node_states').findOne({ nodeId: clusterId });
+            if (existingNode?.status === 'HEALING' && existingNode?.currentAction === 'CLEAR_CACHE') {
+                console.log(`[mitigate] Duplicate suppressed — ${clusterId} is already HEALING with CLEAR_CACHE.`);
+                return res.json({ success: true, message: 'Mitigation already running. Duplicate suppressed.' });
+            }
+            await db.collection('node_states').updateOne({ nodeId: clusterId }, { $set: { status: 'HEALING', currentAction: 'CLEAR_CACHE', isQuarantined: false, updatedAt: new Date() } }, { upsert: true });
+        }
+        await mitigateCluster(clusterId);
+        if (await ensureDbConnection()) {
+            await (0, loadbalancer_1.recalculateRouting)(db);
+            await db.collection('node_states').updateOne({ nodeId: clusterId }, { $set: { status: 'STABLE', currentAction: null, isQuarantined: false, updatedAt: new Date() } }, { upsert: true });
+        }
+        console.log(`[mitigate] Autonomous mitigation executed on ${targetClusterRegion}: ${cacheLayerNamespace}`);
+        return res.json({
+            success: true,
+            message: `Mitigation successful on ${targetClusterRegion}.`,
         });
-        const result = await response.json();
-        console.log(`[mitigate] Sent flush-cache to ${targetClusterRegion}: ${cacheLayerNamespace}`);
-        return res.json(result);
     }
     catch (err) {
-        console.error(`[mitigate] Failed to reach ${targetClusterRegion}:`, err.message);
-        return res.status(502).json({
+        console.error(`[mitigate] Failed to mitigate ${targetClusterRegion}:`, err.message);
+        return res.status(500).json({
             success: false,
-            message: `Failed to reach ${targetClusterRegion}: ${err.message}`,
+            message: `Internal error during mitigation: ${err.message}`,
         });
     }
 });
@@ -170,6 +228,12 @@ app.post('/api/rebalance', async (req, res) => {
         return res.status(400).json({
             success: false,
             message: 'Missing or invalid payload. Required: sourceRegion (string), targetRegion (string), trafficShiftPercentage (number).',
+        });
+    }
+    if (sourceRegion === targetRegion) {
+        return res.status(400).json({
+            success: false,
+            message: 'sourceRegion and targetRegion cannot be the same',
         });
     }
     const resolvedSourceRegion = CLUSTER_ID_TO_REGION[sourceRegion];
@@ -202,13 +266,13 @@ app.post('/api/rebalance', async (req, res) => {
         const mutatedTargetWeight = parseFloat(Math.min(100, updatedDistribution[targetDistKey] + shiftAmount).toFixed(4));
         // Derive the third unaffected region's weight as the 100-sum remainder
         // to guarantee the distribution always sums to exactly 100.
-        const thirdDistKey = Object.keys(updatedDistribution)
-            .find((k) => k !== sourceDistKey && k !== targetDistKey);
+        const availableKeys = Object.keys(updatedDistribution).filter(k => k !== sourceDistKey && k !== targetDistKey);
+        const thirdDistKey = availableKeys[0];
         const derivedThirdWeight = parseFloat((100 - mutatedSourceWeight - mutatedTargetWeight).toFixed(4));
         updatedDistribution[sourceDistKey] = mutatedSourceWeight;
         updatedDistribution[targetDistKey] = mutatedTargetWeight;
         updatedDistribution[thirdDistKey] = derivedThirdWeight;
-        if (mongoConnected) {
+        if (await ensureDbConnection()) {
             await db.collection('load_balancer_state').updateOne({ _id: 'current_state' }, {
                 $set: {
                     traffic_distribution_map: updatedDistribution,
@@ -233,19 +297,65 @@ app.post('/api/rebalance', async (req, res) => {
 });
 // ── Chaos Endpoints ─────────────────────────────────────────────────────────
 /**
+ * POST /api/chaos/inject-fault
+ * Executes programmatic resource fault-injection on isolated cluster workers.
+ */
+app.post('/api/chaos/inject-fault', async (req, res) => {
+    const { targetClusterRegion, faultType } = req.body;
+    if (!targetClusterRegion || !faultType) {
+        return res.status(400).json({ error: 'Missing targetClusterRegion or faultType' });
+    }
+    try {
+        await injectFault(targetClusterRegion, faultType);
+        if (await ensureDbConnection()) {
+            let metricDoc = {
+                timestamp: new Date(),
+                region: (0, loadbalancer_1.normalizeRegion)(targetClusterRegion),
+            };
+            if (faultType === 'NETWORK_DROPOUT') {
+                metricDoc = { ...metricDoc, computeLoadPercentage: 0.0, volatileMemoryAllocationGb: 0.0, networkPackets: 0, clusterOperationalStatus: 'CRITICAL_NETWORK_DOWN' };
+            }
+            else if (faultType === 'MODERATE_LOAD') {
+                metricDoc = { ...metricDoc, computeLoadPercentage: 82.0, volatileMemoryAllocationGb: 8.5, clusterOperationalStatus: 'DEGRADED' };
+            }
+            else {
+                metricDoc = { ...metricDoc, computeLoadPercentage: 98.0, volatileMemoryAllocationGb: 14.0, clusterOperationalStatus: 'CRITICAL' };
+            }
+            // Removed server_health insert
+            await db.collection('node_states').updateOne({ nodeId: targetClusterRegion }, { $set: { status: metricDoc.clusterOperationalStatus, isQuarantined: true, currentLoadPercentage: metricDoc.computeLoadPercentage, metrics: { cpu: metricDoc.computeLoadPercentage, ram: metricDoc.volatileMemoryAllocationGb * 1024, activeConnections: metricDoc.networkPackets ? 150 : 0, responseTimeMs: 20, timestamp: new Date().toISOString() }, updatedAt: new Date() } }, { upsert: true });
+            await (0, loadbalancer_1.recalculateRouting)(db);
+        }
+        console.log(`[chaos] Fault ${faultType} injected into ${targetClusterRegion}`);
+        return res.json({
+            success: true,
+            message: `Successfully injected ${faultType} into ${targetClusterRegion}`,
+        });
+    }
+    catch (err) {
+        console.error('[chaos] Inject fault error:', err.message);
+        return res.status(500).json({ error: 'Failed to inject fault' });
+    }
+});
+/**
  * POST /api/chaos/spike-cpu
  * Takes a specific region name in the request body (e.g. { "region": "US-East-1" })
  * and instantly locks that region's CPU tracking variable to 99.8%.
  */
 app.post('/api/chaos/spike-cpu', async (req, res) => {
-    if (!mongoConnected) {
+    if (!await ensureDbConnection()) {
         return res.status(503).json({ error: 'Database connection not ready' });
     }
     const { region } = req.body;
     if (!region) {
         return res.status(400).json({ error: 'Missing "region" parameter in request body' });
     }
-    const normRegion = (0, loadbalancer_1.normalizeRegion)(region);
+    let normRegion;
+    try {
+        normRegion = (0, loadbalancer_1.normalizeRegion)(region);
+    }
+    catch (err) {
+        return res.status(400).json({ error: err.message });
+    }
     try {
         const metricDoc = {
             timestamp: new Date(),
@@ -254,7 +364,6 @@ app.post('/api/chaos/spike-cpu', async (req, res) => {
             volatileMemoryAllocationGb: 12.0,
             clusterOperationalStatus: 'CRITICAL',
         };
-        await db.collection('server_health').insertOne(metricDoc);
         await db.collection('chaos_locks').updateOne({ region: normRegion }, {
             $set: {
                 type: 'cpu_lock',
@@ -262,6 +371,8 @@ app.post('/api/chaos/spike-cpu', async (req, res) => {
                 updatedAt: new Date(),
             },
         }, { upsert: true });
+        let clusterId = normRegion === 'US-East' ? 'usEastCluster' : normRegion === 'EU-West' ? 'euWestCluster' : 'apSouthCluster';
+        await db.collection('node_states').updateOne({ nodeId: clusterId }, { $set: { status: 'CRITICAL', currentLoadPercentage: 99.8, metrics: { cpu: 99.8, ram: 12.0 * 1024, activeConnections: 150, responseTimeMs: 20, timestamp: new Date().toISOString() }, isQuarantined: true, updatedAt: new Date() } }, { upsert: true });
         const distribution = await (0, loadbalancer_1.recalculateRouting)(db);
         console.log(`[chaos] CPU spiked to 99.8% for region ${normRegion} (${region})`);
         return res.json({
@@ -283,11 +394,17 @@ app.post('/api/chaos/spike-cpu', async (req, res) => {
  * Defaults to "US-East-1" if no region is provided.
  */
 app.post('/api/chaos/kill-network', async (req, res) => {
-    if (!mongoConnected) {
+    if (!await ensureDbConnection()) {
         return res.status(503).json({ error: 'Database connection not ready' });
     }
     const { region = 'US-East-1' } = req.body;
-    const normRegion = (0, loadbalancer_1.normalizeRegion)(region);
+    let normRegion;
+    try {
+        normRegion = (0, loadbalancer_1.normalizeRegion)(region);
+    }
+    catch (err) {
+        return res.status(400).json({ error: err.message });
+    }
     try {
         const metricDoc = {
             timestamp: new Date(),
@@ -297,7 +414,6 @@ app.post('/api/chaos/kill-network', async (req, res) => {
             networkPackets: 0,
             clusterOperationalStatus: 'CRITICAL_NETWORK_DOWN',
         };
-        await db.collection('server_health').insertOne(metricDoc);
         await db.collection('chaos_locks').updateOne({ region: normRegion }, {
             $set: {
                 type: 'network_lock',
@@ -306,6 +422,8 @@ app.post('/api/chaos/kill-network', async (req, res) => {
                 updatedAt: new Date(),
             },
         }, { upsert: true });
+        let clusterId = normRegion === 'US-East' ? 'usEastCluster' : normRegion === 'EU-West' ? 'euWestCluster' : 'apSouthCluster';
+        await db.collection('node_states').updateOne({ nodeId: clusterId }, { $set: { status: 'CRITICAL_NETWORK_DOWN', currentLoadPercentage: 0, metrics: { cpu: 0, ram: 0, activeConnections: 0, responseTimeMs: 20, timestamp: new Date().toISOString() }, isQuarantined: true, updatedAt: new Date() } }, { upsert: true });
         const distribution = await (0, loadbalancer_1.recalculateRouting)(db);
         console.log(`[chaos] Network dropped (CRITICAL_NETWORK_DOWN) for region ${normRegion} (${region})`);
         return res.json({
@@ -326,7 +444,7 @@ app.post('/api/chaos/kill-network', async (req, res) => {
  * returning the load balancer back to its normal 33.3% distribution.
  */
 app.post('/api/chaos/reset', async (req, res) => {
-    if (!mongoConnected) {
+    if (!await ensureDbConnection()) {
         return res.status(503).json({ error: 'Database connection not ready' });
     }
     try {
@@ -334,13 +452,8 @@ app.post('/api/chaos/reset', async (req, res) => {
         const regions = ['US-East', 'EU-West', 'AP-South'];
         const restoreTime = new Date();
         for (const r of regions) {
-            await db.collection('server_health').insertOne({
-                timestamp: restoreTime,
-                region: r,
-                computeLoadPercentage: 25.0,
-                volatileMemoryAllocationGb: 4.5,
-                clusterOperationalStatus: 'STABLE',
-            });
+            let clusterId = r === 'US-East' ? 'usEastCluster' : r === 'EU-West' ? 'euWestCluster' : 'apSouthCluster';
+            await db.collection('node_states').updateOne({ nodeId: clusterId }, { $set: { status: 'STABLE', currentLoadPercentage: 25.0, metrics: { cpu: 25.0, ram: 4500, activeConnections: 150, responseTimeMs: 20, timestamp: new Date().toISOString() }, isQuarantined: false, updatedAt: new Date() } }, { upsert: true });
         }
         const distribution = await (0, loadbalancer_1.recalculateRouting)(db);
         console.log('[chaos] All chaos locks cleared and infrastructure restored.');
@@ -361,7 +474,7 @@ app.post('/api/chaos/reset', async (req, res) => {
  * Reads the database and returns the current metric arrays for all three regions.
  */
 app.get('/api/infrastructure/telemetry', async (req, res) => {
-    if (!mongoConnected) {
+    if (!await ensureDbConnection()) {
         return res.status(503).json({ error: 'Database connection not ready' });
     }
     try {
@@ -391,7 +504,7 @@ app.get('/api/infrastructure/telemetry', async (req, res) => {
 // Start the Server
 async function start() {
     await connectDb();
-    app.listen(PORT, () => {
+    httpServer.listen(PORT, () => {
         console.log(`[chaos-server] Unified Admin & Telemetry server running on port ${PORT}`);
     });
 }

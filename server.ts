@@ -158,6 +158,10 @@ async function getLatestMetrics() {
         currentLoadPercentage: doc.currentLoadPercentage,
         metrics: doc.metrics,
         status: doc.status,
+        // BACKWARDS COMPATIBILITY FOR CACHED APP.JSX:
+        computeLoadPercentage: doc.currentLoadPercentage,
+        volatileMemoryAllocationGb: (doc.metrics?.ram || 0) / 1024,
+        clusterOperationalStatus: doc.status
       };
     }
   }
