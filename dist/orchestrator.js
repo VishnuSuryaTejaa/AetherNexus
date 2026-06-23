@@ -253,8 +253,8 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
                 emitArchitecturalThoughtStreamPacket(cacheFlushBroadcastPacket);
 
                 (async () => {
-                    for (let progress = 25; progress <= 100; progress += 25) {
-                        await new Promise(r => setTimeout(r, 500));
+                    for (let progress = 1; progress <= 100; progress += 1) {
+                        await new Promise(r => setTimeout(r, 300));
                         if (progress === 100) {
                             try { await fetch(`${resolvedDomain1IngressBaseUrl}/api/chaos/reset`, { method: "POST" }); } catch (e) { }
                             emitArchitecturalThoughtStreamPacket({
@@ -267,14 +267,18 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
                                 trafficDistribution: { usEastCluster: 33.3, euWestCluster: 33.3, apSouthCluster: 33.4 }
                             });
                         } else {
-                            emitArchitecturalThoughtStreamPacket({
-                                eventTimestamp: new Date().toISOString(),
-                                principalArchitect: "AetherNexus-Core",
-                                executedMitigationAction: `Healing in progress on ${cacheFlushDirective.targetClusterRegion}...`,
-                                incidentThreatLevelColor: "HEALING",
-                                healingProgress: progress,
-                                targetClusterRegion: mapToClusterId(cacheFlushDirective.targetClusterRegion)
-                            });
+                            // Only emit actual websocket packets every 5% to avoid saturating the network,
+                            // but still provide a smooth progress experience
+                            if (progress % 5 === 0) {
+                                emitArchitecturalThoughtStreamPacket({
+                                    eventTimestamp: new Date().toISOString(),
+                                    principalArchitect: "AetherNexus-Core",
+                                    executedMitigationAction: `Healing in progress on ${cacheFlushDirective.targetClusterRegion}...`,
+                                    incidentThreatLevelColor: "HEALING",
+                                    healingProgress: progress,
+                                    targetClusterRegion: mapToClusterId(cacheFlushDirective.targetClusterRegion)
+                                });
+                            }
                         }
                     }
                 })();
