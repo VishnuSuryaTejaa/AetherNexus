@@ -237,6 +237,15 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
                     acknowledgedAuthorizationToken: cacheFlushDirective.flushOperationAcknowledgementToken,
                     flushExecutionTimestamp: new Date().toISOString(),
                 };
+                const mapToClusterId = (r) => {
+                    if (!r) return r;
+                    const low = r.toLowerCase();
+                    if (low.includes('us')) return 'usEastCluster';
+                    if (low.includes('eu')) return 'euWestCluster';
+                    if (low.includes('ap')) return 'apSouthCluster';
+                    return r;
+                };
+                
                 console.error(`[MCP_CACHE_FLUSH_DISPATCHED] Region: ${cacheFlushDirective.targetClusterRegion} | Namespace: ${cacheFlushDirective.cacheLayerNamespace}`);
                 const cacheFlushBroadcastPacket = {
                     eventTimestamp: new Date().toISOString(),
@@ -244,7 +253,7 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
                     executedMitigationAction: `Cache flush dispatched on ${cacheFlushDirective.targetClusterRegion} — namespace: ${cacheFlushDirective.cacheLayerNamespace}. Healing initiated.`,
                     incidentThreatLevelColor: "HEALING",
                     healingProgress: 0,
-                    targetClusterRegion: cacheFlushDirective.targetClusterRegion,
+                    targetClusterRegion: mapToClusterId(cacheFlushDirective.targetClusterRegion),
                 };
                 emitArchitecturalThoughtStreamPacket(cacheFlushBroadcastPacket);
 
@@ -259,7 +268,7 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
                                 executedMitigationAction: `Healing complete on ${cacheFlushDirective.targetClusterRegion}. Systems nominal.`,
                                 incidentThreatLevelColor: "NOMINAL_GREEN",
                                 healingProgress: null,
-                                targetClusterRegion: cacheFlushDirective.targetClusterRegion,
+                                targetClusterRegion: mapToClusterId(cacheFlushDirective.targetClusterRegion),
                                 trafficDistribution: { usEastCluster: 33.3, euWestCluster: 33.3, apSouthCluster: 33.4 }
                             });
                         } else {
@@ -269,7 +278,7 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
                                 executedMitigationAction: `Healing in progress on ${cacheFlushDirective.targetClusterRegion}...`,
                                 incidentThreatLevelColor: "HEALING",
                                 healingProgress: progress,
-                                targetClusterRegion: cacheFlushDirective.targetClusterRegion
+                                targetClusterRegion: mapToClusterId(cacheFlushDirective.targetClusterRegion)
                             });
                         }
                     }
@@ -281,10 +290,18 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
                 isSystemPaused = true;
                 setTimeout(() => { isSystemPaused = false; }, 300000);
                 const overrideClearanceRequest = JSON.parse(toolArgumentsJson);
-                let targetRegion = overrideClearanceRequest.targetClusterRegion || "usEastCluster";
-                if (overrideClearanceRequest.mitigationActionSummary?.includes("euWestCluster")) targetRegion = "euWestCluster";
-                if (overrideClearanceRequest.mitigationActionSummary?.includes("apSouthCluster")) targetRegion = "apSouthCluster";
-                if (overrideClearanceRequest.mitigationActionSummary?.includes("usEastCluster")) targetRegion = "usEastCluster";
+                const mapToClusterId = (r) => {
+                    if (!r) return r;
+                    const low = r.toLowerCase();
+                    if (low.includes('us')) return 'usEastCluster';
+                    if (low.includes('eu')) return 'euWestCluster';
+                    if (low.includes('ap')) return 'apSouthCluster';
+                    return r;
+                };
+                let targetRegion = mapToClusterId(overrideClearanceRequest.targetClusterRegion) || "usEastCluster";
+                if (overrideClearanceRequest.mitigationActionSummary?.includes("euWestCluster") || overrideClearanceRequest.mitigationActionSummary?.toLowerCase().includes("eu-west")) targetRegion = "euWestCluster";
+                if (overrideClearanceRequest.mitigationActionSummary?.includes("apSouthCluster") || overrideClearanceRequest.mitigationActionSummary?.toLowerCase().includes("ap-south")) targetRegion = "apSouthCluster";
+                if (overrideClearanceRequest.mitigationActionSummary?.includes("usEastCluster") || overrideClearanceRequest.mitigationActionSummary?.toLowerCase().includes("us-east")) targetRegion = "usEastCluster";
                 
                 // [LIVE] — Wire to HITL authorization service in production.
                 const overrideClearanceAcknowledgement = {
@@ -334,12 +351,21 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
                     targetClusterRegion: loadBalanceDirective.targetClusterRegion,
                     executionTimestamp: new Date().toISOString(),
                 };
+                const mapToClusterId = (r) => {
+                    if (!r) return r;
+                    const low = r.toLowerCase();
+                    if (low.includes('us')) return 'usEastCluster';
+                    if (low.includes('eu')) return 'euWestCluster';
+                    if (low.includes('ap')) return 'apSouthCluster';
+                    return r;
+                };
                 console.error(`[MCP_LOAD_BALANCE_DISPATCHED] Region: ${loadBalanceDirective.targetClusterRegion}`);
                 const loadBalanceBroadcastPacket = {
                     eventTimestamp: new Date().toISOString(),
                     principalArchitect: "AetherNexus-Core",
                     executedMitigationAction: `Load balancing executed on ${loadBalanceDirective.targetClusterRegion}`,
                     incidentThreatLevelColor: "NOMINAL_GREEN",
+                    targetClusterRegion: mapToClusterId(loadBalanceDirective.targetClusterRegion)
                 };
                 emitArchitecturalThoughtStreamPacket(loadBalanceBroadcastPacket);
                 return JSON.stringify(loadBalanceAcknowledgement);
