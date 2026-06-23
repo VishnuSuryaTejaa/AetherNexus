@@ -60,50 +60,7 @@ function rotateGroqKey() {
 // Back-compat alias used inside executeAgenticReasoningCycle
 const rotateOpenAiKey = rotateGroqKey;
 // ─── SOP System Prompt (sourced from skills.md §3 & §4 + PROJECT_SPECS §1) ────
-const AUTONOMOUS_CONTROL_PLANE_SYSTEM_PROMPT = `
-You are the AetherNexus Autonomous AI Control Plane — a production-grade, self-healing multi-region infrastructure simulation engine.
-
-## Operational Mandate
-You continuously evaluate live cluster telemetry ingested from the Domain 1 simulation backend. Your role is to autonomously detect processing bottlenecks, classify incident severity, and dispatch the appropriate mitigation action using your authorized toolset.
-
-## Standard Operating Procedures (SOP)
-
-### Threat Classification Matrix
-- computeLoadPercentage >= 90 OR clusterOperationalStatus === "CRITICAL" → incidentThreatLevel: CRITICAL_RED → Autonomous Action: executeClusterCacheFlush, then requestHumanOverrideClearance
-- computeLoadPercentage >= 75 OR clusterOperationalStatus === "DEGRADED" → incidentThreatLevel: WARNING_AMBER → Autonomous Action: executeLoadBalancing to divert traffic
-- computeLoadPercentage < 70 AND clusterOperationalStatus === "STABLE" → incidentThreatLevel: NOMINAL_GREEN → Autonomous Action: NONE (System is stable. Do not invoke tools).
-
-### Execution Constraints
-- You MUST call tools sequentially. Never parallelize destructive operations (cache flushes, override requests).
-- For CRITICAL_RED incidents: always call executeClusterCacheFlush BEFORE requestHumanOverrideClearance.
-- flushOperationAcknowledgementToken must be a newly generated 6-character alphanumeric ID per incident.
-- requestingAgentIdentifier must always be "AetherNexus-Core".
-- incidentClassificationCode format: INC-[6 alphanumeric chars] — generate a unique code per incident.
-
-### Variable Naming
-- Use precise, domain-descriptive identifiers in your reasoning. Banned terms: data, info, temp, obj, item, val, res.
-
-### Agentic Directives
-- If CPU exceeds 90% or Status is CRITICAL, you MUST NOT passively report it. You MUST execute a mitigation function from your available tools (e.g., \`executeClusterCacheFlush\` or \`executeLoadBalancing\`).
-- If the situation is ambiguous, you MUST use diagnostic tools to gather more context before acting.
-- Do NOT output static JSON summaries. Use the appropriate MCP tools directly to enact changes. The backend will handle packaging the final state.
-- IF THE SYSTEM IS STABLE (NOMINAL_GREEN), YOU MUST NOT INVOKE ANY TOOLS. Simply output the final JSON evaluation packet.
-
-### Routing Logic
-If a cluster is flagged as CRITICAL_RED, its traffic distribution MUST drop to 0.0. The remaining traffic must be divided equally among the healthy clusters. Once healed (NOMINAL_GREEN), the traffic must return to an even split.
-
-### Egress Format (CRITICAL)
-You MUST output ONLY a valid JSON object. No conversational text.
-{
-  "eventTimestamp": "<iso_date>",
-  "principalArchitect": "AetherNexus-Core",
-  "executedMitigationAction": "<description of action or state>",
-  "incidentThreatLevelColor": "<CRITICAL_RED | WARNING_AMBER | NOMINAL_GREEN>"
-}
-
-### Data Context Rule
-Live telemetry is provided in the initial user message. Do NOT call 'fetchLiveInfrastructureMetrics' unless you require a secondary manual refresh.
-`.trim();
+const AUTONOMOUS_CONTROL_PLANE_SYSTEM_PROMPT = fs.readFileSync(path.join(process.cwd(), "dist", "SYSTEM_PROMPT.md"), "utf-8");
 // ─── MCP Tool Manifest (mirrors mcpServer.ts registrations exactly) ───────────
 const aetherNexusMcpToolManifest = [
 
@@ -191,6 +148,44 @@ const aetherNexusMcpToolManifest = [
                     }
                 },
                 required: ["targetClusterRegion"],
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "readCodebaseFile",
+            description: "Reads the content of a file in the codebase. Use this to inspect your own prompt, Skills, or MCP implementations.",
+            parameters: {
+                type: "object",
+                properties: {
+                    filePath: {
+                        type: "string",
+                        description: "Path to the file relative to the project root (e.g., 'dist/SYSTEM_PROMPT.md', 'dist/mcpServer.js').",
+                    }
+                },
+                required: ["filePath"],
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "updateCodebaseFile",
+            description: "Overwrites the content of a file in the codebase. Use this to permanently self-modify your instructions, logic, or skills.",
+            parameters: {
+                type: "object",
+                properties: {
+                    filePath: {
+                        type: "string",
+                        description: "Path to the file relative to the project root.",
+                    },
+                    newContent: {
+                        type: "string",
+                        description: "The complete new string content for the file.",
+                    }
+                },
+                required: ["filePath", "newContent"],
             },
         },
     },
@@ -370,6 +365,27 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
                 emitArchitecturalThoughtStreamPacket(loadBalanceBroadcastPacket);
                 return JSON.stringify(loadBalanceAcknowledgement);
             }
+            case "readCodebaseFile": {
+                const { filePath } = JSON.parse(toolArgumentsJson);
+                try {
+                    const resolvedPath = path.join(process.cwd(), filePath);
+                    const fileData = await fs.promises.readFile(resolvedPath, "utf-8");
+                    return JSON.stringify({ fileReadSuccess: true, content: fileData });
+                } catch (err) {
+                    return JSON.stringify({ fileReadSuccess: false, error: err.message });
+                }
+            }
+            case "updateCodebaseFile": {
+                const { filePath, newContent } = JSON.parse(toolArgumentsJson);
+                try {
+                    const resolvedPath = path.join(process.cwd(), filePath);
+                    await fs.promises.writeFile(resolvedPath, newContent, "utf-8");
+                    console.error(`[AI_SELF_MODIFICATION] Updated file: ${filePath}`);
+                    return JSON.stringify({ fileUpdateSuccess: true });
+                } catch (err) {
+                    return JSON.stringify({ fileUpdateSuccess: false, error: err.message });
+                }
+            }
             default: {
                 console.error(`[MCP_TOOL_DISPATCH_UNKNOWN_TOOL_EXCEPTION] Unrecognized tool name: ${dispatchedToolName}`);
                 return JSON.stringify({
@@ -414,6 +430,7 @@ async function executeAgenticReasoningCycle(activeConversationThread) {
                     messages: openRouterConversationThread,
                     tools: aetherNexusMcpToolManifest,
                     tool_choice: "auto",
+                    temperature: 0.1,
                 });
                 const primaryCompletionChoice = llmCompletionResponse.choices[0];
                 if (!primaryCompletionChoice) {
@@ -499,6 +516,7 @@ async function executeAgenticReasoningCycle(activeConversationThread) {
                     messages: mutatingConversationThread,
                     tools: aetherNexusMcpToolManifest,
                     tool_choice: "auto",
+                    temperature: 0.1,
                 });
                 const primaryCompletionChoice = llmCompletionResponse.choices[0];
                 if (!primaryCompletionChoice) {
@@ -594,11 +612,11 @@ US-East: ${process.env.US_EAST_URL || "https://aethernexus-us-east.onrender.com"
 EU-West: ${process.env.EU_WEST_URL || "https://aethernexus-eu-west.onrender.com"}
 AP-South: ${process.env.AP_SOUTH_URL || "https://aethernexus-ap-south.onrender.com"}`;
 
-        const dynamicSystemPrompt = `You are the AetherNexus Autonomous Orchestrator. Your exact capabilities are defined in the injected MCP and Skills documentation below. You must ONLY use the tools explicitly defined. You will receive live MongoDB telemetry. If CPU > 90% or Status is CRITICAL, you MUST execute a mitigation tool.
+        // We dynamically read the prompt again so any AI self-modification takes effect instantly
+        const dynamicSystemPrompt = `${fs.readFileSync(path.join(process.cwd(), "dist", "SYSTEM_PROMPT.md"), "utf-8")}
 
 ${liveEndpoints}
-
-${AUTONOMOUS_CONTROL_PLANE_SYSTEM_PROMPT}`;
+`;
 
         const initialConversationThread = [
             {
