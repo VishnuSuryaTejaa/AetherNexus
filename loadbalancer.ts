@@ -40,12 +40,13 @@ export async function recalculateRouting(db: Db): Promise<TrafficDistributionMap
 
   // Query latest status for all three regions
   for (const r of regions) {
-    const latest = await db.collection<any>('server_health')
-      .findOne({ region: r }, { sort: { timestamp: -1 } });
+    const clusterId = r === 'US-East' ? 'usEastCluster' : r === 'EU-West' ? 'euWestCluster' : 'apSouthCluster';
+    const latest = await db.collection<any>('node_states')
+      .findOne({ nodeId: clusterId });
 
     if (latest) {
-      const status = latest.clusterOperationalStatus;
-      if (status === 'CRITICAL_NETWORK_DOWN' || status === 'CRITICAL' || latest.computeLoadPercentage >= 90 || latest.networkPackets === 0) {
+      const status = latest.status;
+      if (status === 'CRITICAL_NETWORK_DOWN' || status === 'CRITICAL' || latest.currentLoadPercentage >= 90 || latest.metrics?.activeConnections === 0) {
         statusMap[r] = false;
       }
     }

@@ -18,33 +18,19 @@ export async function writeAiLog(payload) {
 export async function getLiveTelemetry() {
     if (!db) return null;
     try {
-        const pipeline = [
-            { $sort: { timestamp: -1 } },
-            {
-                $group: {
-                    _id: '$region',
-                    computeLoadPercentage: { $first: '$computeLoadPercentage' },
-                    volatileMemoryAllocationGb: { $first: '$volatileMemoryAllocationGb' },
-                    clusterOperationalStatus: { $first: '$clusterOperationalStatus' },
-                },
-            },
-        ];
-        const results = await db.collection('server_health').aggregate(pipeline).toArray();
+        const results = await db.collection('node_states').find({}).toArray();
         const infrastructureState = {
             usEastCluster: { computeLoadPercentage: 0, volatileMemoryAllocationGb: 0, clusterOperationalStatus: 'STABLE' },
             euWestCluster: { computeLoadPercentage: 0, volatileMemoryAllocationGb: 0, clusterOperationalStatus: 'STABLE' },
             apSouthCluster: { computeLoadPercentage: 0, volatileMemoryAllocationGb: 0, clusterOperationalStatus: 'STABLE' },
         };
         results.forEach((r) => {
-            const mappedId = r._id === 'US-East' ? 'usEastCluster' 
-                           : r._id === 'EU-West' ? 'euWestCluster'
-                           : r._id === 'AP-South' ? 'apSouthCluster'
-                           : r._id;
+            const mappedId = r.nodeId;
             if (infrastructureState[mappedId]) {
                 infrastructureState[mappedId] = {
-                    computeLoadPercentage: r.computeLoadPercentage,
-                    volatileMemoryAllocationGb: r.volatileMemoryAllocationGb,
-                    clusterOperationalStatus: r.clusterOperationalStatus,
+                    computeLoadPercentage: r.currentLoadPercentage,
+                    volatileMemoryAllocationGb: (r.metrics?.ram || 0) / 1024,
+                    clusterOperationalStatus: r.status,
                 };
             }
         });

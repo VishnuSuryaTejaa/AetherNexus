@@ -159,8 +159,8 @@ export default function App() {
           if (data && data.infrastructureState) {
             setLiveMetrics(data.infrastructureState);
             Object.entries(data.infrastructureState).forEach(([regionId, metrics]) => {
-              const cpu = metrics?.computeLoadPercentage ?? 0;
-              const dbStatus = metrics?.clusterOperationalStatus;
+              const cpu = metrics?.currentLoadPercentage ?? metrics?.computeLoadPercentage ?? 0;
+              const dbStatus = metrics?.status ?? metrics?.clusterOperationalStatus;
               if (dbStatus === 'HEALING') {
                 setStatuses(prev => ({ ...prev, [regionId]: 'HEALING' }));
               } else if (dbStatus === 'CRITICAL_NETWORK_DOWN' || dbStatus === 'CRITICAL') {
@@ -205,8 +205,8 @@ export default function App() {
 
       Object.entries(data).forEach(([regionId, metrics]) => {
         const m = metrics;
-        const cpu = m?.computeLoadPercentage ?? 0;
-        const dbStatus = m?.clusterOperationalStatus;
+        const cpu = m?.currentLoadPercentage ?? m?.computeLoadPercentage ?? 0;
+        const dbStatus = m?.status ?? m?.clusterOperationalStatus;
         if (dbStatus === 'HEALING') {
           setStatuses(prev => ({ ...prev, [regionId]: 'HEALING' }));
         } else if (dbStatus === 'CRITICAL_NETWORK_DOWN' || dbStatus === 'CRITICAL') {
@@ -219,7 +219,8 @@ export default function App() {
           setStatuses(prev => ({ ...prev, [regionId]: 'NOMINAL_GREEN' }));
         }
 
-        const logEntry = `[${new Date().toLocaleTimeString()}] ${regionId.toUpperCase()} | CPU: ${cpu.toFixed(1)}% | RAM: ${m?.volatileMemoryAllocationGb?.toFixed(1)}GB | Status: ${dbStatus}`;
+        const ram = m?.metrics?.ram ? (m.metrics.ram / 1024) : (m?.volatileMemoryAllocationGb || 0);
+        const logEntry = `[${new Date().toLocaleTimeString()}] ${regionId.toUpperCase()} | CPU: ${cpu.toFixed(1)}% | RAM: ${ram.toFixed(1)}GB | Status: ${dbStatus}`;
         setLogs(prev => [logEntry, ...prev].slice(0, 50));
       });
     });
