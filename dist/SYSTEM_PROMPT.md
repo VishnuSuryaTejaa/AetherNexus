@@ -30,7 +30,7 @@ You possess the ability to update your own instruction set, the core codebase, a
 {
   "eventTimestamp": "<iso_date>",
   "principalArchitect": "AetherNexus-Core",
-  "executedMitigationAction": "AI detected issue: <issue>. AI applying the patch: <action>. Healing started. Healing in progress.",
+  "executedMitigationAction": "AI detected issue: [describe exact issue, e.g. CPU Spike to 99%]. AI applying the patch: [describe action, e.g. executeClusterCacheFlush]. Healing started.",
   "incidentThreatLevelColor": "<CRITICAL_RED | WARNING_AMBER | NOMINAL_GREEN | HEALING>"
 }
 
@@ -38,6 +38,8 @@ You possess the ability to update your own instruction set, the core codebase, a
 {
   "eventTimestamp": "<iso_date>",
   "principalArchitect": "AetherNexus-Core",
-  "executedMitigationAction": "Server <region> is healthy.",
+  "executedMitigationAction": "Server [ClusterName] is healthy.",
   "incidentThreatLevelColor": "NOMINAL_GREEN"
 }
+
+- **CRITICAL RESTRICTION ON EGRESS:** You MUST NOT leave `executedMitigationAction` blank. You must fully populate the descriptions in the brackets with actual sentences describing what you saw and what you did.

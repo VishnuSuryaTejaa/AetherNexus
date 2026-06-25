@@ -460,14 +460,7 @@ async function executeAgenticReasoningCycle(activeConversationThread) {
                 }
                 
                 console.error('[DIAGNOSTIC - OPENROUTER RAW RESPONSE]:', JSON.stringify(assistantReasoningMessage, null, 2));
-                if (assistantReasoningMessage.content) {
-                    writeAiLog({
-                        text: assistantReasoningMessage.content,
-                        level: 'info',
-                        timestamp: new Date().toISOString(),
-                        architect: 'AetherNexus-Core'
-                    });
-                }
+                // Removed redundant raw JSON logging to prevent UI clutter
                 openRouterConversationThread.push(assistantReasoningMessage);
                 if (assistantReasoningMessage.tool_calls?.length > 0) {
                     for (const pendingToolInvocation of assistantReasoningMessage.tool_calls) {
@@ -554,14 +547,7 @@ async function executeAgenticReasoningCycle(activeConversationThread) {
                 }
 
                 console.error('[DIAGNOSTIC - LLM RAW RESPONSE]:', JSON.stringify(assistantReasoningMessage, null, 2));
-                if (assistantReasoningMessage.content) {
-                    writeAiLog({
-                        text: assistantReasoningMessage.content,
-                        level: 'info',
-                        timestamp: new Date().toISOString(),
-                        architect: 'AetherNexus-Core'
-                    });
-                }
+                // Removed redundant raw JSON logging to prevent UI clutter
                 mutatingConversationThread.push(assistantReasoningMessage);
                 if (assistantReasoningMessage.tool_calls?.length > 0) {
                     for (const pendingToolInvocation of assistantReasoningMessage.tool_calls) {
