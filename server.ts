@@ -14,7 +14,7 @@ import {
   TrafficDistributionMap
 } from './loadbalancer';
 // @ts-ignore - Bypassing TS strict mode for compiled JS module
-import { bootOrchestrator } from './dist/orchestrator.js';
+import { bootOrchestrator, executeEvaluationCycle } from './dist/orchestrator.js';
 // @ts-ignore - Bypassing TS strict mode for patched JS export
 import { setSharedSocket, setSharedDb } from './dist/egressBroadcaster.js';
 // Local region type — microservices run as separate processes
@@ -402,6 +402,7 @@ app.post('/api/chaos/inject-fault', async (req: Request, res: Response) => {
     }
 
     console.log(`[chaos] Fault ${faultType} injected into ${targetClusterRegion}`);
+    executeEvaluationCycle().catch(err => console.error('[AI] Forced evaluation failed:', err));
     return res.json({
       success: true,
       message: `Successfully injected ${faultType} into ${targetClusterRegion}`,
@@ -464,6 +465,7 @@ app.post('/api/chaos/spike-cpu', async (req: Request, res: Response) => {
     const distribution = await recalculateRouting(db);
 
     console.log(`[chaos] CPU spiked to 99.8% for region ${normRegion} (${region})`);
+    executeEvaluationCycle().catch(err => console.error('[AI] Forced evaluation failed:', err));
     return res.json({
       success: true,
       message: `CPU spiked and locked to 99.8% for region ${normRegion}`,
@@ -528,6 +530,7 @@ app.post('/api/chaos/kill-network', async (req: Request, res: Response) => {
     const distribution = await recalculateRouting(db);
 
     console.log(`[chaos] Network dropped (CRITICAL_NETWORK_DOWN) for region ${normRegion} (${region})`);
+    executeEvaluationCycle().catch(err => console.error('[AI] Forced evaluation failed:', err));
     return res.json({
       success: true,
       message: `Network killed for region ${normRegion}. Status set to CRITICAL_NETWORK_DOWN.`,
