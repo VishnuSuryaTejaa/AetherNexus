@@ -7,7 +7,9 @@ import { emitArchitecturalThoughtStreamPacket, writeAiLog, getLiveTelemetry } fr
 let isSystemPaused = false;
 // ─── Environment Validation & Key Pool Initialization ──────────
 const resolvedOrchestratorModel = process.env["AETHERNEXUS_ORCHESTRATOR_MODEL"] ?? "llama-3.3-70b-versatile";
-const resolvedDomain1IngressBaseUrl = process.env["VITE_API_GATEWAY_URL"] ?? "http://localhost:4000";
+// Instead of relying on VITE_API_GATEWAY_URL (which points to the external frontend URL in prod),
+// the orchestrator should loop back to its host process (AetherNexus Gateway) on the internal port.
+const resolvedDomain1IngressBaseUrl = `http://127.0.0.1:${process.env.PORT || 4000}`;
 // GAP-006 FIX: Spec mandates 30s polling cadence — default corrected from 60000 to 30000.
 const resolvedPollingIntervalMs = parseInt(process.env["AETHERNEXUS_POLLING_INTERVAL_MS"] ?? "30000", 10);
 const resolvedLlmGatewayBaseUrl = process.env["OPENAI_BASE_URL"] ?? "https://api.groq.com/openai/v1";
@@ -224,7 +226,9 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify(cacheFlushDirective)
                     });
-                } catch (e) { }
+                } catch (e: any) {
+                    console.error(`[MCP_CACHE_FLUSH_DISPATCHED] Failed to fetch /api/mitigate: ${e.message}`);
+                }
                 const cacheFlushAcknowledgement = {
                     flushDispatchStatus: "ACKNOWLEDGED",
                     targetClusterRegion: cacheFlushDirective.targetClusterRegion,
@@ -456,6 +460,14 @@ async function executeAgenticReasoningCycle(activeConversationThread) {
                 }
                 
                 console.error('[DIAGNOSTIC - OPENROUTER RAW RESPONSE]:', JSON.stringify(assistantReasoningMessage, null, 2));
+                if (assistantReasoningMessage.content) {
+                    writeAiLog({
+                        text: assistantReasoningMessage.content,
+                        level: 'info',
+                        timestamp: new Date().toISOString(),
+                        architect: 'AetherNexus-Core'
+                    });
+                }
                 openRouterConversationThread.push(assistantReasoningMessage);
                 if (assistantReasoningMessage.tool_calls?.length > 0) {
                     for (const pendingToolInvocation of assistantReasoningMessage.tool_calls) {
@@ -542,6 +554,14 @@ async function executeAgenticReasoningCycle(activeConversationThread) {
                 }
 
                 console.error('[DIAGNOSTIC - LLM RAW RESPONSE]:', JSON.stringify(assistantReasoningMessage, null, 2));
+                if (assistantReasoningMessage.content) {
+                    writeAiLog({
+                        text: assistantReasoningMessage.content,
+                        level: 'info',
+                        timestamp: new Date().toISOString(),
+                        architect: 'AetherNexus-Core'
+                    });
+                }
                 mutatingConversationThread.push(assistantReasoningMessage);
                 if (assistantReasoningMessage.tool_calls?.length > 0) {
                     for (const pendingToolInvocation of assistantReasoningMessage.tool_calls) {

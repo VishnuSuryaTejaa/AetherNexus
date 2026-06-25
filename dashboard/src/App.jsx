@@ -221,7 +221,10 @@ export default function App() {
 
         const ram = m?.metrics?.ram ? (m.metrics.ram / 1024) : (m?.volatileMemoryAllocationGb || 0);
         const logEntry = `[${new Date().toLocaleTimeString()}] ${regionId.toUpperCase()} | CPU: ${cpu.toFixed(1)}% | RAM: ${ram.toFixed(1)}GB | Status: ${dbStatus}`;
-        setLogs(prev => [logEntry, ...prev].slice(0, 50));
+        // Only log anomalies to the terminal to prevent burying AI analysis
+        if (dbStatus !== 'STABLE' || cpu > 75) {
+          setLogs(prev => [logEntry, ...prev].slice(0, 100));
+        }
       });
     });
 

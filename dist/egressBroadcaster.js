@@ -10,6 +10,9 @@ export async function writeAiLog(payload) {
             text: payload.text,
             architect: payload.architect || 'AetherNexus-Core'
         });
+        if (aetherNexusSocketIoEgressServer) {
+            aetherNexusSocketIoEgressServer.emit('ai-log', payload);
+        }
     } catch (e) {
         console.error("[writeAiLog] Error inserting AI log:", e);
     }
