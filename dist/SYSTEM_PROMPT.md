@@ -30,7 +30,7 @@ You possess the ability to update your own instruction set, the core codebase, a
 {
   "eventTimestamp": "<iso_date>",
   "principalArchitect": "AetherNexus-Core",
-  "executedMitigationAction": "<Clinical, precise description of action or state>",
+  "executedMitigationAction": "AI detected issue: <issue>. AI applying the patch: <action>. Healing started. Healing in progress.",
   "incidentThreatLevelColor": "<CRITICAL_RED | WARNING_AMBER | NOMINAL_GREEN | HEALING>"
 }
 
@@ -38,6 +38,6 @@ You possess the ability to update your own instruction set, the core codebase, a
 {
   "eventTimestamp": "<iso_date>",
   "principalArchitect": "AetherNexus-Core",
-  "systemStatus": "STABLE",
+  "executedMitigationAction": "Server <region> is healthy.",
   "incidentThreatLevelColor": "NOMINAL_GREEN"
 }

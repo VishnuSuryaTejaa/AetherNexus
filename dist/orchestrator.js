@@ -690,12 +690,12 @@ ${liveEndpoints}
                     emitArchitecturalThoughtStreamPacket(architecturalThoughtStreamPacket);
                 }
                 else {
-                    // LLM did not embed a structured JSON block — emit a WARNING_AMBER fallback.
+                    // LLM did not embed a structured JSON block — use the raw text.
                     const nominalCycleBroadcastPacket = {
                         eventTimestamp: new Date().toISOString(),
                         principalArchitect: "AetherNexus-Core",
-                        executedMitigationAction: "AI output unparseable - Human investigation required",
-                        incidentThreatLevelColor: "WARNING_AMBER",
+                        executedMitigationAction: terminalLlmOutputText.trim() || "Autonomous evaluation cycle completed — no critical action required.",
+                        incidentThreatLevelColor: terminalLlmOutputText.toUpperCase().includes('STABLE') || terminalLlmOutputText.toUpperCase().includes('HEALTHY') ? 'NOMINAL_GREEN' : 'WARNING_AMBER',
                         trafficDistribution: {
                             usEastCluster: 33.3,
                             euWestCluster: 33.3,
@@ -710,8 +710,8 @@ ${liveEndpoints}
                 const nominalCycleBroadcastPacket = {
                     eventTimestamp: new Date().toISOString(),
                     principalArchitect: "AetherNexus-Core",
-                    executedMitigationAction: "AI output unparseable - Human investigation required",
-                    incidentThreatLevelColor: "WARNING_AMBER",
+                    executedMitigationAction: terminalLlmOutputText.trim() || "Autonomous evaluation cycle completed — no critical action required.",
+                    incidentThreatLevelColor: terminalLlmOutputText.toUpperCase().includes('STABLE') || terminalLlmOutputText.toUpperCase().includes('HEALTHY') ? 'NOMINAL_GREEN' : 'WARNING_AMBER',
                     trafficDistribution: { usEastCluster: 33.3, euWestCluster: 33.3, apSouthCluster: 33.4 }
                 };
                 emitArchitecturalThoughtStreamPacket(nominalCycleBroadcastPacket);

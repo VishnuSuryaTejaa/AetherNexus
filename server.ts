@@ -106,14 +106,14 @@ async function connectDb() {
     setSharedDb(db);
     mongoConnected = true;
     console.log('[server] Connected to MongoDB Atlas successfully.');
-    
+
     // Initialize the routing table on startup
     await recalculateRouting(db);
 
     // Boot the AI evaluation engine inside the main process
     await bootOrchestrator();
     console.log('[server] AI Orchestrator engine initialized and running.');
-    
+
     // High-frequency telemetry broadcast loop
     setInterval(async () => {
       try {
@@ -241,7 +241,7 @@ app.post('/api/mitigate', async (req: Request, res: Response) => {
     }
 
     await mitigateCluster(clusterId as Region);
-    
+
     if (await ensureDbConnection()) {
       // Restore node_states to STABLE so recalculateRouting immediately sees it as healthy
       await db.collection<any>('node_states').updateOne(
@@ -488,7 +488,7 @@ app.post('/api/chaos/kill-network', async (req: Request, res: Response) => {
   }
 
   const { region = 'US-East-1' } = req.body;
-  
+
   let normRegion;
   try {
     normRegion = normalizeRegion(region);
