@@ -511,6 +511,9 @@ async function executeAgenticReasoningCycle(activeConversationThread, cycleId) {
                 openRouterException?.code === "rate_limit_exceeded";
             if (shouldFallback) {
                 console.error(`[ORCHESTRATOR_OPENROUTER_FALLBACK] OpenRouter returned ${openRouterStatus}. Falling back to Groq key pool.`);
+                // Preserve OpenRouter's progress so Groq doesn't re-execute the same tools
+                mutatingConversationThread.length = 0;
+                mutatingConversationThread.push(...openRouterConversationThread);
             } else {
                 console.error("[ORCHESTRATOR_OPENROUTER_EXCEPTION] Unexpected OpenRouter error — falling back to Groq.", openRouterException);
             }
