@@ -98,7 +98,7 @@ export default function Diagnostics({ onReturn, logs, statuses, trafficWeights }
 
   return (
     <div style={{
-      width: '100%', minHeight: '100%', background: '#0a0a0a',
+      width: '100%', height: '100%', background: '#0a0a0a',
       color: '#fff', fontFamily: 'monospace', padding: '40px', boxSizing: 'border-box',
       overflowY: 'auto', position: 'absolute', top: 0, left: 0, zIndex: 10
     }}>
@@ -143,11 +143,19 @@ export default function Diagnostics({ onReturn, logs, statuses, trafficWeights }
               </li>
               <li style={{ borderLeft: '3px solid #00e5ff', paddingLeft: '15px' }}>
                 <strong style={{ color: '#00e5ff' }}>[ RECENT MITIGATIONS ]</strong><br />
-                {logs && logs.length > 0 ? (
-                  logs.slice(-3).map((l, i) => <div key={i}>- {typeof l === 'object' && l.executedMitigationAction ? l.executedMitigationAction : (typeof l === 'string' ? l : l.text || '')}</div>)
-                ) : (
-                  "No critical mitigations executed in the current session timeframe."
-                )}
+                {(() => {
+                  const mitigationLogs = logs ? logs.filter(l => 
+                    (typeof l === 'object' && l.executedMitigationAction) || 
+                    (typeof l === 'string' && l.startsWith('[AI -')) || 
+                    (typeof l === 'object' && l.text)
+                  ) : [];
+                  
+                  return mitigationLogs.length > 0 ? (
+                    mitigationLogs.slice(-3).map((l, i) => <div key={i}>- {typeof l === 'object' && l.executedMitigationAction ? l.executedMitigationAction : (typeof l === 'string' ? l : l.text || '')}</div>)
+                  ) : (
+                    "No critical mitigations executed in the current session timeframe."
+                  );
+                })()}
               </li>
               <li style={{ borderLeft: `3px solid ${currentThreatColor === 'CRITICAL_RED' ? '#ff3333' : (currentThreatColor === 'WARNING_AMBER' ? '#ffaa00' : '#00ff41')}`, paddingLeft: '15px' }}>
                 <strong style={{ color: currentThreatColor === 'CRITICAL_RED' ? '#ff3333' : (currentThreatColor === 'WARNING_AMBER' ? '#ffaa00' : '#00ff41') }}>[ PREDICTIVE THREAT ANALYSIS ]</strong><br />
