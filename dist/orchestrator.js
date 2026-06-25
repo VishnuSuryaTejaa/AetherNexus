@@ -603,8 +603,9 @@ async function executeAgenticReasoningCycle(activeConversationThread) {
 // ─── Infrastructure Evaluation Loop (60s polling cadence) ─────────────────────
 console.error("[ORCHESTRATOR_BOOTSTRAP] AetherNexus Autonomous Orchestrator — Evaluation loop initialized.");
 let isEvaluating = false;
-export async function executeEvaluationCycle() {
-    if (isSystemPaused || isEvaluating) return;
+export async function executeEvaluationCycle(forced = false) {
+    if (isSystemPaused) return;
+    if (isEvaluating && !forced) return;
     isEvaluating = true;
     console.error(`[ORCHESTRATOR_CYCLE_START] Timestamp: ${new Date().toISOString()}`);
     writeAiLog({ text: '[AI] Evaluation cycle started — ingesting live telemetry snapshot.', level: 'info', timestamp: new Date().toISOString(), architect: 'AetherNexus-Core' });
