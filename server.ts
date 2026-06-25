@@ -206,9 +206,9 @@ app.post('/api/mitigate', async (req: Request, res: Response) => {
     // Fix name mapping: normalize cluster-style IDs to camelCase IDs safely
     let clusterId = targetClusterRegion;
     const rLow = (clusterId || '').toLowerCase();
-    if (rLow.includes('us')) clusterId = 'usEastCluster';
-    else if (rLow.includes('eu')) clusterId = 'euWestCluster';
-    else if (rLow.includes('ap')) clusterId = 'apSouthCluster';
+    if (rLow.includes('east')) clusterId = 'usEastCluster';
+    else if (rLow.includes('west')) clusterId = 'euWestCluster';
+    else if (rLow.includes('south')) clusterId = 'apSouthCluster';
 
     // Also reverse-map to the normalizeRegion format for chaos_locks lookup
     let normRegion: string;

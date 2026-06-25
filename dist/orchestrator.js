@@ -251,9 +251,9 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
                 const mapToClusterId = (r) => {
                     if (!r) return r;
                     const low = r.toLowerCase();
-                    if (low.includes('us')) return 'usEastCluster';
-                    if (low.includes('eu')) return 'euWestCluster';
-                    if (low.includes('ap')) return 'apSouthCluster';
+                    if (low.includes('east')) return 'usEastCluster';
+                    if (low.includes('west')) return 'euWestCluster';
+                    if (low.includes('south')) return 'apSouthCluster';
                     return r;
                 };
 
@@ -310,9 +310,9 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
                 const mapToClusterId = (r) => {
                     if (!r) return r;
                     const low = r.toLowerCase();
-                    if (low.includes('us')) return 'usEastCluster';
-                    if (low.includes('eu')) return 'euWestCluster';
-                    if (low.includes('ap')) return 'apSouthCluster';
+                    if (low.includes('east')) return 'usEastCluster';
+                    if (low.includes('west')) return 'euWestCluster';
+                    if (low.includes('south')) return 'apSouthCluster';
                     return r;
                 };
                 let targetRegion = mapToClusterId(overrideClearanceRequest.targetClusterRegion) || "usEastCluster";
@@ -371,9 +371,9 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
                 const mapToClusterId = (r) => {
                     if (!r) return r;
                     const low = r.toLowerCase();
-                    if (low.includes('us')) return 'usEastCluster';
-                    if (low.includes('eu')) return 'euWestCluster';
-                    if (low.includes('ap')) return 'apSouthCluster';
+                    if (low.includes('east')) return 'usEastCluster';
+                    if (low.includes('west')) return 'euWestCluster';
+                    if (low.includes('south')) return 'apSouthCluster';
                     return r;
                 };
                 console.error(`[MCP_LOAD_BALANCE_DISPATCHED] Region: ${loadBalanceDirective.targetClusterRegion}`);
