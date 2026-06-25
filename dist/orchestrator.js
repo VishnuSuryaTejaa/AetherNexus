@@ -256,7 +256,9 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
                     for (let progress = 1; progress <= 100; progress += 1) {
                         await new Promise(r => setTimeout(r, 300));
                         if (progress === 100) {
-                            try { await fetch(`${resolvedDomain1IngressBaseUrl}/api/chaos/reset`, { method: "POST" }); } catch (e) { }
+                            // NOTE: Do NOT call /api/chaos/reset here — that nukes all 3 clusters globally.
+                            // The chaos_lock for this specific region was already cleared atomically
+                            // by /api/mitigate at the START of this cycle (the first fetch above).
                             emitArchitecturalThoughtStreamPacket({
                                 eventTimestamp: new Date().toISOString(),
                                 principalArchitect: "AetherNexus-Core",

@@ -203,11 +203,17 @@ app.post('/api/mitigate', async (req: Request, res: Response) => {
   }
 
   try {
-    // Fix name mapping
+    // Fix name mapping: normalize cluster-style IDs to camelCase IDs
     let clusterId = targetClusterRegion;
     if (clusterId === 'US-East' || clusterId === 'US-East-1') clusterId = 'usEastCluster';
     if (clusterId === 'EU-West' || clusterId === 'EU-West-1') clusterId = 'euWestCluster';
     if (clusterId === 'AP-South' || clusterId === 'AP-South-1') clusterId = 'apSouthCluster';
+
+    // Also reverse-map to the normalizeRegion format for chaos_locks lookup
+    let normRegion: string;
+    if (clusterId === 'usEastCluster') normRegion = 'US-East';
+    else if (clusterId === 'euWestCluster') normRegion = 'EU-West';
+    else normRegion = 'AP-South';
 
     if (await ensureDbConnection()) {
       const existingNode = await db.collection<any>('node_states').findOne({ nodeId: clusterId });
@@ -222,15 +228,27 @@ app.post('/api/mitigate', async (req: Request, res: Response) => {
       );
     }
 
+    // ── CRITICAL FIX: Clear the chaos_lock for this specific region immediately ──
+    // Without this, the chaos lock document persists in MongoDB and will re-apply
+    // CRITICAL status on the very next telemetry ingestion tick, making the AI's
+    // mitigation appear ineffective even though the node itself was successfully healed.
+    if (await ensureDbConnection()) {
+      const deletedLock = await db.collection<any>('chaos_locks').deleteOne({ region: normRegion });
+      if (deletedLock.deletedCount > 0) {
+        console.log(`[mitigate] Chaos lock cleared for region ${normRegion} (${clusterId}).`);
+      }
+    }
+
     await mitigateCluster(clusterId as Region);
     
     if (await ensureDbConnection()) {
-      await recalculateRouting(db);
+      // Restore node_states to STABLE so recalculateRouting immediately sees it as healthy
       await db.collection<any>('node_states').updateOne(
         { nodeId: clusterId },
-        { $set: { status: 'STABLE', currentAction: null, isQuarantined: false, updatedAt: new Date() } },
+        { $set: { status: 'STABLE', currentAction: null, isQuarantined: false, currentLoadPercentage: 25.0, metrics: { cpu: 25.0, ram: 4500, activeConnections: 150, responseTimeMs: 20, timestamp: new Date().toISOString() }, updatedAt: new Date() } },
         { upsert: true }
       );
+      await recalculateRouting(db);
     }
 
     console.log(`[mitigate] Autonomous mitigation executed on ${targetClusterRegion}: ${cacheLayerNamespace}`);
