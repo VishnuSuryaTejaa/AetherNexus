@@ -687,17 +687,25 @@ ${liveEndpoints}
             console.error(`[ORCHESTRATOR_CYCLE_COMPLETE] AI Evaluation Summary:\n${terminalLlmOutputText}`);
             // ── Parse LLM-structured egress packet and broadcast to Domain 3 ─────
             try {
-                const firstBrace = terminalLlmOutputText.indexOf('{');
+                let parsedLlmEgressDirective = null;
                 const lastBrace = terminalLlmOutputText.lastIndexOf('}');
-                if (firstBrace !== -1 && lastBrace !== -1 && lastBrace >= firstBrace) {
-                    let cleanJsonString = terminalLlmOutputText.substring(firstBrace, lastBrace + 1);
-                    cleanJsonString = cleanJsonString.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-                    let parsedLlmEgressDirective;
+                let currentStart = terminalLlmOutputText.lastIndexOf('{');
+                while (currentStart !== -1 && lastBrace !== -1 && currentStart < lastBrace) {
                     try {
-                        parsedLlmEgressDirective = JSON.parse(cleanJsonString);
-                    } catch (e) {
-                        throw new Error("Invalid JSON parsed from LLM");
+                        let potentialJson = terminalLlmOutputText.substring(currentStart, lastBrace + 1);
+                        parsedLlmEgressDirective = JSON.parse(potentialJson);
+                        if (parsedLlmEgressDirective && typeof parsedLlmEgressDirective === 'object') {
+                            break;
+                        }
+                    } catch (err) {
+                        // Ignore syntax error and try the next outer/previous opening brace
                     }
+                    currentStart = terminalLlmOutputText.lastIndexOf('{', currentStart - 1);
+                }
+                
+                if (!parsedLlmEgressDirective) {
+                    throw new Error("Invalid JSON parsed from LLM");
+                }
 
                     const architecturalThoughtStreamPacket = {
                         eventTimestamp: parsedLlmEgressDirective.eventTimestamp ??
@@ -714,22 +722,7 @@ ${liveEndpoints}
                         }
                     };
                     emitArchitecturalThoughtStreamPacket(architecturalThoughtStreamPacket);
-                }
-                else {
-                    // LLM did not embed a structured JSON block — use the raw text.
-                    const nominalCycleBroadcastPacket = {
-                        eventTimestamp: new Date().toISOString(),
-                        principalArchitect: "AetherNexus-Core",
-                        executedMitigationAction: terminalLlmOutputText.trim() || "Autonomous evaluation cycle completed — no critical action required.",
-                        incidentThreatLevelColor: terminalLlmOutputText.toUpperCase().includes('STABLE') || terminalLlmOutputText.toUpperCase().includes('HEALTHY') ? 'NOMINAL_GREEN' : 'WARNING_AMBER',
-                        trafficDistribution: {
-                            usEastCluster: 33.3,
-                            euWestCluster: 33.3,
-                            apSouthCluster: 33.4
-                        }
-                    };
-                    emitArchitecturalThoughtStreamPacket(nominalCycleBroadcastPacket);
-                }
+
             }
             catch (egressPacketParseException) {
                 console.error("[SOCKET_EGRESS_PACKET_PARSE_EXCEPTION]", egressPacketParseException);
