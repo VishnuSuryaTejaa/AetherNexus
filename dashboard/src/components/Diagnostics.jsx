@@ -151,7 +151,7 @@ export default function Diagnostics({ onReturn, logs, statuses, trafficWeights }
                   ) : [];
                   
                   return mitigationLogs.length > 0 ? (
-                    mitigationLogs.slice(-3).map((l, i) => <div key={i}>- {typeof l === 'object' && l.executedMitigationAction ? l.executedMitigationAction : (typeof l === 'string' ? l : l.text || '')}</div>)
+                    mitigationLogs.slice(-3).map((l, i) => <div key={i} style={{ whiteSpace: 'pre-wrap', marginBottom: '10px' }}>- {typeof l === 'object' && l.executedMitigationAction ? l.executedMitigationAction : (typeof l === 'string' ? l : l.text || '')}</div>)
                   ) : (
                     "No critical mitigations executed in the current session timeframe."
                   );

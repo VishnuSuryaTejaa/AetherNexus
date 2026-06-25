@@ -226,7 +226,7 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify(cacheFlushDirective)
                     });
-                } catch (e: any) {
+                } catch (e) {
                     console.error(`[MCP_CACHE_FLUSH_DISPATCHED] Failed to fetch /api/mitigate: ${e.message}`);
                 }
                 const cacheFlushAcknowledgement = {
