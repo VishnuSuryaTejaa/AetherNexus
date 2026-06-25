@@ -432,7 +432,7 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
     }
 }
 // ─── Agentic Tool-Calling Loop ─────────────────────────────────────────────────
-async function executeAgenticReasoningCycle(activeConversationThread) {
+async function executeAgenticReasoningCycle(activeConversationThread, cycleId) {
     const mutatingConversationThread = [...activeConversationThread];
 
     // GAP-004 FIX: Try OpenRouter as primary engine first, fall back to Groq key pool.
@@ -447,6 +447,8 @@ async function executeAgenticReasoningCycle(activeConversationThread) {
                     console.error("[ORCHESTRATOR_AGENTIC_CYCLE_EXCEPTION] OpenRouter: Maximum agentic reasoning steps exceeded.");
                     break;
                 }
+                if (cycleId !== undefined && currentCycleId !== cycleId) return openRouterConversationThread;
+
                 const llmCompletionResponse = await openRouterClient.chat.completions.create({
                     model: "openai/gpt-oss-120b:free",
                     messages: openRouterConversationThread,
@@ -534,6 +536,8 @@ async function executeAgenticReasoningCycle(activeConversationThread) {
                     console.error("[ORCHESTRATOR_AGENTIC_CYCLE_EXCEPTION] Maximum agentic reasoning steps exceeded.");
                     break;
                 }
+                if (cycleId !== undefined && currentCycleId !== cycleId) return mutatingConversationThread;
+
                 const llmCompletionResponse = await aetherNexusLlmClient.chat.completions.create({
                     model: resolvedOrchestratorModel,
                     messages: mutatingConversationThread,
@@ -615,6 +619,8 @@ async function executeAgenticReasoningCycle(activeConversationThread) {
 // ─── Infrastructure Evaluation Loop (60s polling cadence) ─────────────────────
 console.error("[ORCHESTRATOR_BOOTSTRAP] AetherNexus Autonomous Orchestrator — Evaluation loop initialized.");
 let isEvaluating = false;
+let currentCycleId = 0;
+
 export async function executeEvaluationCycle(forced = false) {
     if (isSystemPaused) {
         if (forced) {
@@ -622,6 +628,8 @@ export async function executeEvaluationCycle(forced = false) {
         }
         return;
     }
+    
+    const cycleId = ++currentCycleId;
     if (isEvaluating && !forced) return;
     isEvaluating = true;
     console.error(`[ORCHESTRATOR_CYCLE_START] Timestamp: ${new Date().toISOString()}`);
@@ -657,8 +665,17 @@ ${liveEndpoints}
             },
             telemetryContextMessage,
         ];
-        const completedConversationThread = await executeAgenticReasoningCycle(initialConversationThread);
-        const terminalAssistantMessage = completedConversationThread
+        
+        if (currentCycleId !== cycleId) {
+            console.error(`[ORCHESTRATOR] Cycle ${cycleId} aborted because a newer cycle started.`);
+            return;
+        }
+
+        let activeThread = await executeAgenticReasoningCycle(initialConversationThread, cycleId);
+        
+        if (currentCycleId !== cycleId) return;
+
+        const terminalAssistantMessage = activeThread
             .filter((conversationTurn) => conversationTurn.role === "assistant")
             .at(-1);
         if (terminalAssistantMessage &&
