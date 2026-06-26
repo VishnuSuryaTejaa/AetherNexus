@@ -13,23 +13,36 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
+      - key: OPENAI_API_KEY2
+        sync: false
+      - key: OPENAI_API_KEY3
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENAI_BASE_URL
+        sync: false
       - key: US_EAST_URL
         sync: false   # Set to Render URL of us-east-cluster after deploy
       - key: EU_WEST_URL
         sync: false   # Set to Render URL of eu-west-cluster after deploy
       - key: AP_SOUTH_URL
         sync: false   # Set to Render URL of ap-south-cluster after deploy
-      - key: OPENAI_BASE_URL
-        sync: false
-      - key: VITE_API_GATEWAY_URL        sync: false
-      - key: OPENROUTER_API_KEY
-        sync: false
-      - key: GROQ_API_KEY_1
-        sync: false
-      - key: GROQ_API_KEY_2
-        sync: false
-      - key: GROQ_API_KEY_3
-        sync: false
+      - key: AETHERNEXUS_GATEWAY_URL
+        sync: false   # Set to this service's own Render URL (e.g. https://aethernexus-gateway.onrender.com)
+      - key: VITE_API_GATEWAY_URL
+        sync: false   # Same as AETHERNEXUS_GATEWAY_URL — consumed by Vite build
+      - key: ALLOWED_ORIGINS
+        sync: false   # Comma-separated allowed CORS origins for production
+      - key: CHAOS_API_TOKEN
+        sync: false   # Bearer token required for chaos endpoints in production
+      - key: SLACK_WEBHOOK_URL
+        sync: false   # Optional: Slack/Discord webhook for CRITICAL_RED alerts
+      - key: AETHERNEXUS_ORCHESTRATOR_MODEL
+        sync: false   # Optional: override default Groq model
+      - key: AETHERNEXUS_POLLING_INTERVAL_MS
+        sync: false   # Optional: override AI polling interval (default 30000)
+      - key: PORT
+        value: "4000"
 
   # ─── US-East Cluster Microservice ────────────────────────────────────────────
   - type: web
@@ -44,6 +57,8 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
+      - key: PORT
+        value: "3001"
 
   # ─── EU-West Cluster Microservice ────────────────────────────────────────────
   - type: web
@@ -58,6 +73,8 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
+      - key: PORT
+        value: "3002"
 
   # ─── AP-South Cluster Microservice ───────────────────────────────────────────
   - type: web
@@ -72,3 +89,5 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
+      - key: PORT
+        value: "3004"

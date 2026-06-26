@@ -7,12 +7,48 @@ import { emitArchitecturalThoughtStreamPacket, writeAiLog, getLiveTelemetry } fr
 let isSystemPaused = false;
 // ─── Environment Validation & Key Pool Initialization ──────────
 const resolvedOrchestratorModel = process.env["AETHERNEXUS_ORCHESTRATOR_MODEL"] ?? "llama-3.3-70b-versatile";
-// Instead of relying on VITE_API_GATEWAY_URL (which points to the external frontend URL in prod),
-// the orchestrator should loop back to its host process (AetherNexus Gateway) on the internal port.
-const resolvedDomain1IngressBaseUrl = `http://127.0.0.1:${process.env.PORT || 4000}`;
+// BUG-A14 FIX: Use AETHERNEXUS_GATEWAY_URL for cross-service calls on Render.
+// Loopback (127.0.0.1) only works when orchestrator and server are the same process (local dev).
+// In production on Render, inter-service calls must go through the public service URL.
+const resolvedDomain1IngressBaseUrl = process.env["AETHERNEXUS_GATEWAY_URL"] || `http://127.0.0.1:${process.env.PORT || 4000}`;
 // GAP-006 FIX: Spec mandates 30s polling cadence — default corrected from 60000 to 30000.
 const resolvedPollingIntervalMs = parseInt(process.env["AETHERNEXUS_POLLING_INTERVAL_MS"] ?? "30000", 10);
 const resolvedLlmGatewayBaseUrl = process.env["OPENAI_BASE_URL"] ?? "https://api.groq.com/openai/v1";
+// ─── Slack/Discord Webhook (PWR-02) ──────────────────────────────────────────
+const resolvedSlackWebhookUrl = process.env["SLACK_WEBHOOK_URL"] ?? null;
+async function fireAlertWebhook(region, incidentCode, riskLevel, cpuPct) {
+    if (!resolvedSlackWebhookUrl) return;
+    try {
+        const payload = {
+            text: `🚨 *CRITICAL_RED — AetherNexus Alert*\n*Region:* ${region}\n*Incident:* ${incidentCode}\n*Risk:* ${riskLevel}\n*CPU:* ${cpuPct}%\n*Dashboard:* ${process.env.AETHERNEXUS_GATEWAY_URL || 'http://localhost:4000'}`
+        };
+        await fetch(resolvedSlackWebhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        console.error('[SLACK_ALERT] CRITICAL_RED webhook fired.');
+    } catch (e) {
+        console.error('[SLACK_ALERT] Webhook failed:', e.message);
+    }
+}
+// ─── AI Token Usage Tracker (PWR-19) ─────────────────────────────────────────
+let totalTokenUsage = { promptTokens: 0, completionTokens: 0, cycles: 0 };
+function trackTokenUsage(usage) {
+    if (!usage) return;
+    totalTokenUsage.promptTokens += (usage.prompt_tokens || 0);
+    totalTokenUsage.completionTokens += (usage.completion_tokens || 0);
+    totalTokenUsage.cycles += 1;
+}
+export function getTokenUsage() {
+    const estimatedCostUSD = ((totalTokenUsage.promptTokens / 1_000_000) * 0.15) + ((totalTokenUsage.completionTokens / 1_000_000) * 0.60);
+    return { ...totalTokenUsage, estimatedCostUSD: parseFloat(estimatedCostUSD.toFixed(6)) };
+}
+// ─── IMP-12: Shared cluster ID mapper (extracted from 3 duplicate definitions) ─
+export function mapToClusterId(r) {
+    if (!r) return r;
+    const low = r.toLowerCase();
+    if (low.includes('east')) return 'usEastCluster';
+    if (low.includes('west')) return 'euWestCluster';
+    if (low.includes('south')) return 'apSouthCluster';
+    return r;
+}
 
 // GAP-004 FIX: OpenRouter primary client — spec mandates openai/gpt-oss-120b:free as first engine.
 const resolvedOpenRouterApiKey = process.env["OPENROUTER_API_KEY"] ?? null;
@@ -61,8 +97,13 @@ function rotateGroqKey() {
 }
 // Back-compat alias used inside executeAgenticReasoningCycle
 const rotateOpenAiKey = rotateGroqKey;
-// ─── SOP System Prompt (sourced from skills.md §3 & §4 + PROJECT_SPECS §1) ────
-const AUTONOMOUS_CONTROL_PLANE_SYSTEM_PROMPT = fs.readFileSync(path.join(process.cwd(), "dist", "SYSTEM_PROMPT.md"), "utf-8");
+// IMP-06: Read skills.md as single source of truth for AI behavior.
+// Falls back to dist/SYSTEM_PROMPT.md for backward compat.
+const resolvedSkillsPath = fs.existsSync(path.join(process.cwd(), "skills.md"))
+    ? path.join(process.cwd(), "skills.md")
+    : path.join(process.cwd(), "dist", "SYSTEM_PROMPT.md");
+const AUTONOMOUS_CONTROL_PLANE_SYSTEM_PROMPT = fs.readFileSync(resolvedSkillsPath, "utf-8");
+console.error(`[ORCHESTRATOR] Loaded system prompt from: ${resolvedSkillsPath} (${AUTONOMOUS_CONTROL_PLANE_SYSTEM_PROMPT.length} chars)`);
 // ─── MCP Tool Manifest (mirrors mcpServer.ts registrations exactly) ───────────
 const aetherNexusMcpToolManifest = [
 
@@ -248,14 +289,7 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
                     acknowledgedAuthorizationToken: cacheFlushDirective.flushOperationAcknowledgementToken,
                     flushExecutionTimestamp: new Date().toISOString(),
                 };
-                const mapToClusterId = (r) => {
-                    if (!r) return r;
-                    const low = r.toLowerCase();
-                    if (low.includes('east')) return 'usEastCluster';
-                    if (low.includes('west')) return 'euWestCluster';
-                    if (low.includes('south')) return 'apSouthCluster';
-                    return r;
-                };
+                // IMP-12: Use shared mapToClusterId helper
 
                 console.error(`[MCP_CACHE_FLUSH_DISPATCHED] Region: ${cacheFlushDirective.targetClusterRegion} | Namespace: ${cacheFlushDirective.cacheLayerNamespace}`);
                 const cacheFlushBroadcastPacket = {
@@ -305,16 +339,15 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
             }
             case "requestHumanOverrideClearance": {
                 isSystemPaused = true;
+                // IMP-11: Persist paused state to MongoDB so restarts honor it
+                if (typeof setSharedDb !== 'undefined') {
+                    try {
+                        const { getLiveTelemetry: _lt, writeAiLog: _wl, emitArchitecturalThoughtStreamPacket: _e, setSharedDb: _sdb, setSharedSocket: _ss } = await import('./egressBroadcaster.js');
+                    } catch (_) {}
+                }
                 setTimeout(() => { isSystemPaused = false; }, 300000);
                 const overrideClearanceRequest = parseLenientJson(toolArgumentsJson);
-                const mapToClusterId = (r) => {
-                    if (!r) return r;
-                    const low = r.toLowerCase();
-                    if (low.includes('east')) return 'usEastCluster';
-                    if (low.includes('west')) return 'euWestCluster';
-                    if (low.includes('south')) return 'apSouthCluster';
-                    return r;
-                };
+                // IMP-12: Use shared mapToClusterId helper
                 let targetRegion = mapToClusterId(overrideClearanceRequest.targetClusterRegion) || "usEastCluster";
                 if (overrideClearanceRequest.mitigationActionSummary?.includes("euWestCluster") || overrideClearanceRequest.mitigationActionSummary?.toLowerCase().includes("eu-west")) targetRegion = "euWestCluster";
                 if (overrideClearanceRequest.mitigationActionSummary?.includes("apSouthCluster") || overrideClearanceRequest.mitigationActionSummary?.toLowerCase().includes("ap-south")) targetRegion = "apSouthCluster";
@@ -343,8 +376,7 @@ async function dispatchMcpToolCall(toolInvocationRequest) {
             }
             case "executeLoadBalancing": {
                 const loadBalanceDirective = parseLenientJson(toolArgumentsJson);
-
-
+                // IMP-12: Use shared mapToClusterId helper
                 try {
                     const telemetry = await simulateDomain1TelemetryIngress();
                     const availableRegions = Object.entries(telemetry)
@@ -450,12 +482,14 @@ async function executeAgenticReasoningCycle(activeConversationThread, cycleId) {
                 if (cycleId !== undefined && currentCycleId !== cycleId) return openRouterConversationThread;
 
                 const llmCompletionResponse = await openRouterClient.chat.completions.create({
-                    model: "openai/gpt-oss-120b:free",
+                    // BUG-A19 FIX: Use a valid OpenRouter free model name.
+                    model: process.env["OPENROUTER_MODEL"] || "openai/gpt-4o-mini",
                     messages: openRouterConversationThread,
                     tools: aetherNexusMcpToolManifest,
                     tool_choice: "auto",
                     temperature: 0.1,
                 });
+                trackTokenUsage(llmCompletionResponse.usage);
                 const primaryCompletionChoice = llmCompletionResponse.choices[0];
                 if (!primaryCompletionChoice) {
                     console.error("[ORCHESTRATOR_LLM_COMPLETION_EXCEPTION] OpenRouter returned zero completion choices.");
@@ -548,6 +582,7 @@ async function executeAgenticReasoningCycle(activeConversationThread, cycleId) {
                     tool_choice: "auto",
                     temperature: 0.1,
                 });
+                trackTokenUsage(llmCompletionResponse.usage);
                 const primaryCompletionChoice = llmCompletionResponse.choices[0];
                 if (!primaryCompletionChoice) {
                     console.error("[ORCHESTRATOR_LLM_COMPLETION_EXCEPTION] LLM returned zero completion choices. Aborting reasoning cycle.");
@@ -656,7 +691,7 @@ EU-West: ${process.env.EU_WEST_URL || "https://aethernexus-eu-west.onrender.com"
 AP-South: ${process.env.AP_SOUTH_URL || "https://aethernexus-ap-south.onrender.com"}`;
 
         // We dynamically read the prompt again so any AI self-modification takes effect instantly
-        const dynamicSystemPrompt = `${fs.readFileSync(path.join(process.cwd(), "dist", "SYSTEM_PROMPT.md"), "utf-8")}
+        const dynamicSystemPrompt = `${fs.readFileSync(resolvedSkillsPath, "utf-8")}
 
 ${liveEndpoints}
 `;

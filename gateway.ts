@@ -29,10 +29,11 @@ interface RoutingTable {
 }
 
 // In-memory routing table initialized to nominal even weights
+// BUG-A09 FIX: AP-South-1 was 33.3 (total=99.9). Now 33.4 to match loadbalancer.ts default (total=100).
 let routingTable: RoutingTable = {
   'US-East-1': 33.3,
   'EU-West-1': 33.3,
-  'AP-South-1': 33.3,
+  'AP-South-1': 33.4,
 };
 
 let db: Db;

@@ -1,4 +1,4 @@
-import { useRef, useMemo, useEffect, useState } from 'react';
+import { useRef, useMemo, useEffect, useState, useCallback } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Html } from '@react-three/drei';
 import * as THREE from 'three';
@@ -106,7 +106,7 @@ function DataFlowSystem({ apiGatewayPos, racks, statuses, trafficWeights }) {
       if (status === 'CRITICAL_RED') colorObj.set('#ff3333');
       else if (status === 'WARNING_AMBER') colorObj.set('#ffaa00');
       else if (status === 'HEALING') colorObj.set('#ffd700');
-      else colorObj.set('#00ff00');
+      else colorObj.set('#00ff41');  // BUG-A12 FIX: was #00ff00
 
       meshRef.current.setColorAt(i, colorObj);
     });
@@ -123,7 +123,7 @@ function DataFlowSystem({ apiGatewayPos, racks, statuses, trafficWeights }) {
 }
 
 export default function App() {
-  console.log('[DEBUG] Active Gateway URL:', import.meta.env.VITE_API_GATEWAY_URL);
+  // BUG-A11 FIX: Removed debug console.log from render body (leaked env var in prod)
   const [currentView, setCurrentView] = useState('topology');
   const [logs, setLogs] = useState([]);
   const [trafficWeights, setTrafficWeights] = useState({ usEastCluster: 33.3, euWestCluster: 33.3, apSouthCluster: 33.4 });
@@ -132,8 +132,11 @@ export default function App() {
     euWestCluster: 'NOMINAL_GREEN',
     apSouthCluster: 'NOMINAL_GREEN'
   });
-  const [healingProgresses, setHealingProgresses] = useState({});
+  const [healingProgresses, setHealingProgresses] = useState<Record<string, number | null>>({});
   const [liveMetrics, setLiveMetrics] = useState({});
+  // PWR-03: Track system paused state from AI broadcasts
+  const [isSystemPaused, setIsSystemPaused] = useState(false);
+  const [pauseCountdown, setPauseCountdown] = useState<number | null>(null);
 
   const mitigationIntervals = useRef({});
 
@@ -152,51 +155,38 @@ export default function App() {
 
   useEffect(() => {
     const socket = io(GATEWAY_URL);
-    socket.on('connect', () => {
+    const onConnect = () => {
       fetch(`${GATEWAY_URL}/api/telemetry`)
         .then(res => res.json())
         .then(data => {
           if (data && data.infrastructureState) {
             setLiveMetrics(data.infrastructureState);
-            Object.entries(data.infrastructureState).forEach(([regionId, metrics]) => {
+            Object.entries(data.infrastructureState).forEach(([regionId, metrics]: [string, any]) => {
               const cpu = metrics?.currentLoadPercentage ?? metrics?.computeLoadPercentage ?? 0;
               const dbStatus = metrics?.status ?? metrics?.clusterOperationalStatus;
-              if (dbStatus === 'HEALING') {
-                setStatuses(prev => ({ ...prev, [regionId]: 'HEALING' }));
-              } else if (dbStatus === 'CRITICAL_NETWORK_DOWN' || dbStatus === 'CRITICAL') {
-                setStatuses(prev => ({ ...prev, [regionId]: 'CRITICAL_RED' }));
-              } else if (cpu > 90) {
-                setStatuses(prev => ({ ...prev, [regionId]: 'CRITICAL_RED' }));
-              } else if (cpu > 75) {
-                setStatuses(prev => ({ ...prev, [regionId]: 'WARNING_AMBER' }));
-              } else {
-                setStatuses(prev => ({ ...prev, [regionId]: 'NOMINAL_GREEN' }));
-              }
+              if (dbStatus === 'HEALING') setStatuses(prev => ({ ...prev, [regionId]: 'HEALING' }));
+              else if (dbStatus === 'CRITICAL_NETWORK_DOWN' || dbStatus === 'CRITICAL') setStatuses(prev => ({ ...prev, [regionId]: 'CRITICAL_RED' }));
+              else if (cpu > 90) setStatuses(prev => ({ ...prev, [regionId]: 'CRITICAL_RED' }));
+              else if (cpu > 75) setStatuses(prev => ({ ...prev, [regionId]: 'WARNING_AMBER' }));
+              else setStatuses(prev => ({ ...prev, [regionId]: 'NOMINAL_GREEN' }));
             });
           }
         }).catch(err => console.error('Reconnect fetch failed', err));
-    });
+    };
+    socket.on('connect', onConnect);
 
     socket.on('aethernexus-telemetry-broadcast', (data) => {
-      // GAP-010 FIX: unified newest-first ordering
       setLogs(prev => [data, ...prev].slice(0, 100));
-
-      if (data.trafficDistribution) {
-        setTrafficWeights(data.trafficDistribution);
+      if (data.trafficDistribution) setTrafficWeights(data.trafficDistribution);
+      // PWR-03: Detect system paused state from broadcast
+      if (data.incidentThreatLevelColor === 'CRITICAL_RED' && data.executedMitigationAction?.includes('Human override')) {
+        setIsSystemPaused(true);
+        setPauseCountdown(300);
       }
-
+      if (data.incidentThreatLevelColor === 'NOMINAL_GREEN') setIsSystemPaused(false);
       if (data.targetClusterRegion && data.incidentThreatLevelColor) {
-        const targetId = data.targetClusterRegion;
-        setStatuses(prev => ({
-          ...prev,
-          [targetId]: data.incidentThreatLevelColor
-        }));
-        if (data.healingProgress !== undefined) {
-          setHealingProgresses(prev => ({
-            ...prev,
-            [targetId]: data.healingProgress
-          }));
-        }
+        setStatuses(prev => ({ ...prev, [data.targetClusterRegion]: data.incidentThreatLevelColor }));
+        if (data.healingProgress !== undefined) setHealingProgresses(prev => ({ ...prev, [data.targetClusterRegion]: data.healingProgress }));
       }
     });
 
@@ -284,6 +274,8 @@ export default function App() {
     });
 
     return () => {
+      // BUG-A18 FIX: Remove ALL registered listeners including 'connect'
+      socket.off('connect', onConnect);
       socket.off('aethernexus-telemetry-broadcast');
       socket.off('live-metrics-stream');
       socket.off('ai-log');
@@ -294,7 +286,8 @@ export default function App() {
     };
   }, []);
 
-  const handleManualMitigate = async (region) => {
+  // IMP-17: useCallback to prevent DevOpsControls re-render on every state change
+  const handleManualMitigate = useCallback(async (region: string) => {
     try {
       const res = await fetch(`${GATEWAY_URL}/api/mitigate`, {
         method: 'POST',
@@ -302,16 +295,11 @@ export default function App() {
         body: JSON.stringify({ targetClusterRegion: region, cacheLayerNamespace: 'manual-ui-override' })
       });
       const data = await res.json();
-      if (!data.success) throw new Error("Mitigation failed on backend");
-
+      if (!data.success) throw new Error('Mitigation failed on backend');
       setStatuses(prev => ({ ...prev, [region]: 'HEALING' }));
       setHealingProgresses(prev => ({ ...prev, [region]: 0 }));
       let progress = 0;
-
-      if (mitigationIntervals.current[region]) {
-        clearInterval(mitigationIntervals.current[region]);
-      }
-
+      if (mitigationIntervals.current[region]) clearInterval(mitigationIntervals.current[region]);
       mitigationIntervals.current[region] = setInterval(() => {
         progress += 1;
         if (progress >= 100) {
@@ -326,13 +314,36 @@ export default function App() {
       console.error('Manual mitigation failed', e);
       setStatuses(prev => ({ ...prev, [region]: 'CRITICAL_RED' }));
     }
+  }, []);
+
+  // BUG-A12 FIX: Use canonical color constants from AGENTS.md / skills.md
+  const colorMap: Record<string, string> = {
+    NOMINAL_GREEN: '#00ff41',  // was #00ff00
+    WARNING_AMBER: '#ffb000',
+    CRITICAL_RED: '#ff003c',
+    HEALING: '#ffd700',
   };
 
-  const colorMap = {
-    NOMINAL_GREEN: '#00ff00',
-    WARNING_AMBER: '#ffaa00',
-    CRITICAL_RED: '#ff3333',
-    HEALING: '#ffd700',
+  // PWR-10: Export logs as JSON file
+  const handleExportLogs = () => {
+    const blob = new Blob([JSON.stringify(logs, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `aethernexus-logs-${new Date().toISOString().replace(/:/g, '-').slice(0, 19)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // PWR-03: Resume AI system
+  const handleResumeSystem = async () => {
+    try {
+      await fetch(`${GATEWAY_URL}/api/system/resume`, { method: 'POST' });
+      setIsSystemPaused(false);
+      setPauseCountdown(null);
+    } catch (e) {
+      console.error('Resume failed', e);
+    }
   };
 
   return (
@@ -387,6 +398,16 @@ export default function App() {
               Session: Admin
             </div>
             <h3 style={{ borderBottom: '1px solid rgba(0, 229, 255, 0.3)', paddingBottom: 15, marginTop: 0, letterSpacing: '2px' }}>TELEMETRY LOGS</h3>
+
+            {/* PWR-03: System Paused Banner */}
+            {isSystemPaused && (
+              <div style={{ marginBottom: 10, padding: '10px', background: 'rgba(255,0,60,0.15)', border: '1px solid #ff003c', borderRadius: 4, color: '#ff003c', fontSize: 11, fontFamily: 'monospace' }}>
+                ⚠ AI PAUSED — Human Override Pending
+                <button onClick={handleResumeSystem} style={{ display: 'block', marginTop: 6, width: '100%', padding: '6px', background: '#ff003c', border: 'none', color: '#fff', fontFamily: 'monospace', cursor: 'pointer', borderRadius: 3, fontWeight: 'bold' }}>
+                  [ RESUME AI ]
+                </button>
+              </div>
+            )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flexGrow: 1, overflowY: 'auto' }}>
               {logs.map((log, i) => {
@@ -460,6 +481,15 @@ export default function App() {
               onMouseOut={(e) => { e.target.style.background = 'transparent'; e.target.style.boxShadow = '0 0 10px rgba(0, 229, 255, 0.2)'; }}
             >
               [ LAUNCH DIAGNOSTICS ]
+            </button>
+            {/* PWR-10: Export logs button */}
+            <button
+              onClick={handleExportLogs}
+              style={{ marginTop: '8px', width: '100%', padding: '10px', background: 'transparent', border: '1px solid rgba(0,229,255,0.4)', color: 'rgba(0,229,255,0.7)', fontFamily: 'monospace', cursor: 'pointer', borderRadius: '4px', fontWeight: 'bold', letterSpacing: '1px', fontSize: '11px', transition: 'all 0.3s ease' }}
+              onMouseOver={(e: any) => { e.target.style.background = 'rgba(0,229,255,0.07)'; }}
+              onMouseOut={(e: any) => { e.target.style.background = 'transparent'; }}
+            >
+              [ EXPORT LOGS ]
             </button>
           </div>
         </>

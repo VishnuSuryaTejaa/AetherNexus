@@ -6,9 +6,11 @@
   "scripts": {
     "start": "npx ts-node server.ts",
     "mcp": "node dist/mcpServer.js",
-    "chaos-server": "ts-node server.ts",
     "gateway": "ts-node gateway.ts",
-    "start:all": "concurrently \"npx ts-node server.ts\" \"npx ts-node nodes/us-east-node.ts\" \"npx ts-node nodes/eu-west-node.ts\" \"npx ts-node nodes/ap-south-node.ts\" \"cd dashboard && npm run dev\""
+    "chaos-server": "ts-node server.ts",
+    "pre-deploy-check": "node scripts/pre-deploy-check.mjs",
+    "integration-test": "node scripts/integration-test.mjs",
+    "start:all": "concurrently \"npx ts-node server.ts\" \"npx ts-node nodes/us-east-node.ts\" \"npx ts-node nodes/eu-west-node.ts\" \"npx ts-node nodes/ap-south-node.ts\" \"npm --prefix dashboard run dev\""
   },
   "keywords": [],
   "author": "",

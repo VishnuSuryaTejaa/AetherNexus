@@ -1,10 +1,12 @@
 import express from 'express';
+import cors from 'cors';
 import { MongoClient, Db } from 'mongodb';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 const app = express();
+app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 3002;
@@ -53,6 +55,16 @@ function stopIntensiveMathLoop() {
   }
   cpuLoad = 25 + Math.random() * 5;
 }
+
+// IMP-10: Kubernetes/Render health check endpoints
+app.get('/health', (_req, res) => {
+  res.status(200).json({ status: 'ok', region: REGION_DB_NAME, regionId: REGION_ID, port: PORT, cpuLoad: parseFloat(cpuLoad.toFixed(1)), clusterStatus });
+});
+app.get('/healthz', (_req, res) => res.status(200).json({ alive: true }));
+app.get('/readyz', (_req, res) => {
+  if (!db) return res.status(503).json({ ready: false, reason: 'MongoDB not connected' });
+  res.status(200).json({ ready: true, region: REGION_DB_NAME });
+});
 
 app.post('/inject-fault', (req, res) => {
   const { targetClusterRegion, faultType } = req.body;

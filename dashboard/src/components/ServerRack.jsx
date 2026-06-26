@@ -14,10 +14,10 @@ const frameGeo = new THREE.BoxGeometry(rackWidth, rackHeight, rackDepth);
 // 3. The Solid Server Slabs (10 thick blades with distinct gaps)
 const numBlades = 10;
 const bladeHeight = 0.25;
-const bladeDepth = 1.3; // Slightly shorter than the glass case so they sit inside
+const bladeDepth = 1.3;
 const bladeGeo = new THREE.BoxGeometry(rackWidth - 0.2, bladeHeight, bladeDepth);
 const bladeMat = new THREE.MeshStandardMaterial({
-  color: '#1a1a1a', // Deep, flat grey to make the lights pop
+  color: '#1a1a1a',
   metalness: 0.4,
   roughness: 0.9,
 });
@@ -26,48 +26,35 @@ const bladeMat = new THREE.MeshStandardMaterial({
 const ledsPerBlade = 4;
 const totalLEDs = numBlades * ledsPerBlade;
 const ledGeo = new THREE.SphereGeometry(0.035, 16, 16);
-
-// ATOMIC FIX: Switched from MeshStandardMaterial to MeshBasicMaterial.
-// This ignores shadows and guarantees the LED sphere acts like pure light.
-const ledMat = new THREE.MeshBasicMaterial({
-  color: '#ffffff', // This will be immediately overwritten by the useFrame loop
-});
+const ledMat = new THREE.MeshBasicMaterial({ color: '#ffffff' });
 
 const sharedColor = new THREE.Color();
 
-export default function ServerRack({ position, label, status, healingProgress }) {
+// BUG-A12 canonical colors
+const STATUS_COLORS = {
+  NOMINAL_GREEN: { base: new THREE.Color('#00ff41'), dim: new THREE.Color('#002200') },
+  WARNING_AMBER: { base: new THREE.Color('#ffb000'), dim: new THREE.Color('#331a00') },
+  CRITICAL_RED: { base: new THREE.Color('#ff003c'), dim: new THREE.Color('#220000') },
+  HEALING: { base: new THREE.Color('#ffd700'), dim: new THREE.Color('#332200') },
+};
+
+export default function ServerRack({ position, label, status, healingProgress, metrics }) {
   const ledMeshRef = useRef();
-
-  // ATOMIC FIX: Updated to ultra-bright neon hex codes so they pop perfectly.
-  const colorMap = useMemo(() => ({
-    NOMINAL_GREEN: { base: new THREE.Color('#00ff00'), dim: new THREE.Color('#002200') },
-    WARNING_AMBER: { base: new THREE.Color('#ffaa00'), dim: new THREE.Color('#331a00') },
-    CRITICAL_RED: { base: new THREE.Color('#ff0000'), dim: new THREE.Color('#220000') },
-    HEALING: { base: new THREE.Color('#00ffff'), dim: new THREE.Color('#003344') },
-  }), []);
-
-  const currentColors = colorMap[status] || colorMap.NOMINAL_GREEN;
+  const currentColors = STATUS_COLORS[status] || STATUS_COLORS.NOMINAL_GREEN;
 
   // 5. The Mathematical Layout of the LEDs
   const ledData = useMemo(() => {
     const data = [];
-    const spacing = rackHeight / numBlades; // Vertical gap between blades
-    const startY = (rackHeight / 2) - (spacing / 2); // Top-most blade position
-
+    const spacing = rackHeight / numBlades;
+    const startY = (rackHeight / 2) - (spacing / 2);
     for (let i = 0; i < numBlades; i++) {
-      const y = startY - (i * spacing); // Step down for each blade
+      const y = startY - (i * spacing);
       for (let j = 0; j < ledsPerBlade; j++) {
-        // Space the 4 LEDs perfectly across the front of the blade
         const x = -0.45 + (j * 0.3);
-        const z = (bladeDepth / 2) + 0.015; // Mount them just on the front face
-
+        const z = (bladeDepth / 2) + 0.015;
         const matrix = new THREE.Matrix4();
         matrix.setPosition(x, y, z);
-        data.push({
-          matrix,
-          blinkOffset: Math.random() * Math.PI * 2,
-          blinkSpeed: 0.5 + Math.random() * 1.5 // A slower, more realistic idle blink
-        });
+        data.push({ matrix, blinkOffset: Math.random() * Math.PI * 2, blinkSpeed: 0.5 + Math.random() * 1.5 });
       }
     }
     return data;
@@ -76,33 +63,28 @@ export default function ServerRack({ position, label, status, healingProgress })
   useFrame((state) => {
     if (!ledMeshRef.current) return;
     const time = state.clock.elapsedTime;
-
-    // Frantic blinking if the server is dying
     const speedMultiplier = status === 'CRITICAL_RED' ? 6 : (status === 'WARNING_AMBER' ? 3 : (status === 'HEALING' ? 4 : 1));
 
     ledData.forEach((led, i) => {
       ledMeshRef.current.setMatrixAt(i, led.matrix);
       const blink = Math.sin(time * led.blinkSpeed * speedMultiplier + led.blinkOffset);
-
-      // The material is now Basic, so this setColorAt command is all you need 
-      // to change the total color of the orb.
-      if (blink > 0) {
-        sharedColor.copy(currentColors.base);
-      } else {
-        sharedColor.copy(currentColors.dim);
-      }
+      sharedColor.copy(blink > 0 ? currentColors.base : currentColors.dim);
       ledMeshRef.current.setColorAt(i, sharedColor);
     });
 
     ledMeshRef.current.instanceMatrix.needsUpdate = true;
-    if (ledMeshRef.current.instanceColor) {
-      ledMeshRef.current.instanceColor.needsUpdate = true;
-    }
+    if (ledMeshRef.current.instanceColor) ledMeshRef.current.instanceColor.needsUpdate = true;
   });
+
+  // Derive live metrics for 3D label (IMP from AGENTS.md — render metrics prop)
+  const cpu = metrics?.currentLoadPercentage ?? metrics?.computeLoadPercentage ?? null;
+  const ram = metrics?.volatileMemoryAllocationGb
+    ? metrics.volatileMemoryAllocationGb.toFixed(1)
+    : metrics?.metrics?.ram ? (metrics.metrics.ram / 1024).toFixed(1) : null;
+  const statusLabel = metrics?.status ?? metrics?.clusterOperationalStatus ?? status;
 
   return (
     <group position={position}>
-
       {/* The Glass Display Case */}
       <mesh geometry={frameGeo}>
         <meshStandardMaterial color="#000000" transparent opacity={0.15} depthWrite={false} />
@@ -113,14 +95,7 @@ export default function ServerRack({ position, label, status, healingProgress })
       {Array.from({ length: numBlades }).map((_, i) => {
         const spacing = rackHeight / numBlades;
         const y = (rackHeight / 2) - (spacing / 2) - (i * spacing);
-        return (
-          <mesh
-            key={i}
-            geometry={bladeGeo}
-            material={bladeMat}
-            position={[0, y, 0]}
-          />
-        );
+        return <mesh key={i} geometry={bladeGeo} material={bladeMat} position={[0, y, 0]} />;
       })}
 
       {/* The Glowing Orbs */}
@@ -128,7 +103,7 @@ export default function ServerRack({ position, label, status, healingProgress })
         <instancedBufferAttribute attach="instanceColor" args={[new Float32Array(totalLEDs * 3), 3]} />
       </instancedMesh>
 
-      {/* Holographic Text Output */}
+      {/* Holographic Text Output — now includes live metrics (AGENTS.md requirement) */}
       <Html center position={[0, -3.2, 0]}>
         <div style={{
           color: currentColors.base.getStyle(),
@@ -137,13 +112,26 @@ export default function ServerRack({ position, label, status, healingProgress })
           fontWeight: 'bold',
           letterSpacing: '1px',
           whiteSpace: 'nowrap',
-          textAlign: 'center'
+          textAlign: 'center',
+          minWidth: '110px',
         }}>
-          <div>{label}</div>
+          <div style={{ fontSize: '13px' }}>{label}</div>
+          {/* Live metric labels from metrics prop */}
+          {cpu !== null && (
+            <div style={{ fontSize: '10px', marginTop: '3px', color: cpu > 90 ? '#ff003c' : cpu > 75 ? '#ffb000' : '#00ff41', opacity: 0.9 }}>
+              CPU: {cpu.toFixed(1)}%
+            </div>
+          )}
+          {ram !== null && (
+            <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.6)', marginTop: '1px' }}>
+              RAM: {ram}GB
+            </div>
+          )}
+          {/* Healing progress bar */}
           {healingProgress !== undefined && healingProgress !== null && (
-            <div style={{ marginTop: '5px', width: '100px', height: '10px', border: `1px solid ${currentColors.base.getStyle()}`, background: 'rgba(0,0,0,0.5)' }}>
+            <div style={{ marginTop: '5px', width: '100px', height: '8px', border: `1px solid ${currentColors.base.getStyle()}`, background: 'rgba(0,0,0,0.5)' }}>
               <div style={{ width: `${healingProgress}%`, height: '100%', background: currentColors.base.getStyle(), transition: 'width 0.3s ease' }} />
-              <div style={{ fontSize: '10px', marginTop: '2px', color: '#fff' }}>Healing: {healingProgress}%</div>
+              <div style={{ fontSize: '9px', marginTop: '2px', color: '#ffd700' }}>HEAL: {healingProgress}%</div>
             </div>
           )}
         </div>

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, Legend } from 'recharts';
-import { Activity, ShieldAlert, Clock, ArrowLeft, Cpu } from 'lucide-react';
+import { Activity, ShieldAlert, Clock, ArrowLeft, Cpu, Sun, Moon, Download } from 'lucide-react';
 
 const COLORS = ['#00e5ff', '#ffaa00', '#00ff41'];
 const THREAT_COLORS = { nominal: '#00ff41', warning: '#ffaa00', critical: '#ff3333' };
@@ -8,6 +8,18 @@ const THREAT_COLORS = { nominal: '#00ff41', warning: '#ffaa00', critical: '#ff33
 export default function Diagnostics({ onReturn, logs, statuses, trafficWeights }) {
   const [telemetry, setTelemetry] = useState(null);
   const [loading, setLoading] = useState(true);
+  // PWR-14: Dark/Light mode toggle
+  const [isDark, setIsDark] = useState(true);
+  // PWR-09: SLA data
+  const [slaData, setSlaData] = useState(null);
+  const theme = {
+    bg: isDark ? '#0a0a0a' : '#f4f6fa',
+    card: isDark ? 'rgba(20, 20, 25, 0.65)' : 'rgba(255,255,255,0.85)',
+    text: isDark ? '#fff' : '#1a1a2e',
+    accent: isDark ? '#00e5ff' : '#0077b6',
+    border: isDark ? 'rgba(0, 229, 255, 0.4)' : 'rgba(0,119,182,0.3)',
+    subtext: isDark ? '#a0a0a0' : '#555',
+  };
 
   useEffect(() => {
     const fetchTelemetry = () => {
@@ -15,15 +27,24 @@ export default function Diagnostics({ onReturn, logs, statuses, trafficWeights }
         .then(res => res.json())
         .then(data => {
           setTelemetry(data);
-          setTimeout(() => setLoading(false), 1500); // Artificial delay for syncing effect
+          setLoading(false); // BUG-A20 FIX: Remove artificial 1500ms delay
         })
         .catch(err => {
           console.error(err);
           setLoading(false);
         });
     };
+
+    const fetchSla = () => {
+      fetch(`${import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:4000'}/api/sla`)
+        .then(res => res.json())
+        .then(data => setSlaData(data.sla))
+        .catch(() => {});
+    };
+
     fetchTelemetry();
-    const interval = setInterval(fetchTelemetry, 5000);
+    fetchSla();
+    const interval = setInterval(() => { fetchTelemetry(); fetchSla(); }, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -91,37 +112,48 @@ export default function Diagnostics({ onReturn, logs, statuses, trafficWeights }
     ];
   }
 
-  const latestLog = logs && logs.length > 0 ? logs[logs.length - 1] : null;
+  // BUG-A13 FIX: logs are newest-first, so index 0 is the latest (not length-1)
+  const latestLog = logs && logs.length > 0 ? logs[0] : null;
   const currentThreatColor = latestLog?.incidentThreatLevelColor || 'NOMINAL_GREEN';
   const threatDisplay = currentThreatColor.split('_')[0];
   const trafficKey = trafficWeights ? JSON.stringify(trafficWeights) : 'default';
 
   return (
     <div style={{
-      width: '100%', height: '100%', background: '#0a0a0a',
-      color: '#fff', fontFamily: 'monospace', padding: '40px', boxSizing: 'border-box',
-      overflowY: 'auto', position: 'absolute', top: 0, left: 0, zIndex: 10
+      width: '100%', height: '100%', background: theme.bg,
+      color: theme.text, fontFamily: 'monospace', padding: 'clamp(20px, 4vw, 40px)',
+      boxSizing: 'border-box', overflowY: 'auto', position: 'absolute', top: 0, left: 0, zIndex: 10
     }}>
       <style>{`
         @keyframes spin { 100% { transform: rotate(360deg); } }
+        @media (max-width: 768px) {
+          .diag-grid { grid-template-columns: 1fr !important; }
+          .diag-header { flex-direction: column !important; gap: 12px !important; }
+          .diag-chart-row { grid-template-columns: 1fr !important; }
+        }
       `}</style>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px', borderBottom: '1px solid rgba(0, 229, 255, 0.3)', paddingBottom: '20px' }}>
-        <h1 style={{ margin: 0, color: '#00e5ff', letterSpacing: '2px', textShadow: '0 0 10px rgba(0, 229, 255, 0.5)' }}>
+      {/* Header — PWR-18: mobile-responsive flex-wrap */}
+      <div className="diag-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px', borderBottom: `1px solid ${theme.border}`, paddingBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+        <h1 style={{ margin: 0, color: theme.accent, letterSpacing: '2px', textShadow: `0 0 10px ${theme.accent}50` }}>
           AETHERNEXUS // DIAGNOSTICS
         </h1>
-        <button
-          onClick={onReturn}
-          style={{
-            background: 'rgba(0, 229, 255, 0.1)', border: '1px solid #00e5ff', color: '#00e5ff',
-            padding: '10px 20px', borderRadius: '4px', cursor: 'pointer', fontFamily: 'monospace',
-            display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold'
-          }}
-          onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(0, 229, 255, 0.2)'; e.currentTarget.style.boxShadow = '0 0 15px rgba(0, 229, 255, 0.4)'; }}
-          onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(0, 229, 255, 0.1)'; e.currentTarget.style.boxShadow = 'none'; }}
-        >
-          <ArrowLeft size={16} />
-          RETURN TO TOPOLOGY
-        </button>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {/* PWR-14: Dark/Light toggle */}
+          <button
+            onClick={() => setIsDark(d => !d)}
+            title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            style={{ background: 'transparent', border: `1px solid ${theme.border}`, color: theme.accent, padding: '8px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+          >
+            {isDark ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+          <button
+            onClick={onReturn}
+            style={{ background: `${theme.accent}1a`, border: `1px solid ${theme.accent}`, color: theme.accent, padding: '10px 20px', borderRadius: '4px', cursor: 'pointer', fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}
+          >
+            <ArrowLeft size={16} />
+            RETURN TO TOPOLOGY
+          </button>
+        </div>
       </div>
 
       {/* AI Orchestrator Analysis */}

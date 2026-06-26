@@ -15,12 +15,14 @@ export interface LoadBalancerState {
 /**
  * Normalizes user-facing/telemetry region names to a standard key format.
  */
-export function normalizeRegion(region: string): string {
+export function normalizeRegion(region: string): string | null {
   const r = region.trim().toUpperCase();
   if (r === 'US-EAST' || r === 'US-EAST-1' || r === 'USEASTCLUSTER') return 'US-East';
   if (r === 'EU-WEST' || r === 'EU-WEST-1' || r === 'EUWESTCLUSTER') return 'EU-West';
   if (r === 'AP-SOUTH' || r === 'AP-SOUTH-1' || r === 'APSOUTHCLUSTER') return 'AP-South';
-  throw new Error(`Unrecognized region identifier: ${region}`);
+  // BUG-A05 FIX: Return null for unrecognized input instead of throwing.
+  // Callers must null-check. Never let this function crash the process.
+  return null;
 }
 
 /**
