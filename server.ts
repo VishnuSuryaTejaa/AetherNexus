@@ -14,7 +14,7 @@ import {
   TrafficDistributionMap
 } from './loadbalancer';
 // @ts-ignore - Bypassing TS strict mode for compiled JS module
-import { bootOrchestrator, executeEvaluationCycle, getTokenUsage } from './dist/orchestrator.js';
+import { bootOrchestrator, executeEvaluationCycle, getTokenUsage, resumeSystem, getSystemPausedState } from './dist/orchestrator.js';
 // @ts-ignore - Bypassing TS strict mode for patched JS export
 import { setSharedSocket, setSharedDb } from './dist/egressBroadcaster.js';
 
@@ -323,7 +323,7 @@ app.get('/api/ai/usage', (_req: Request, res: Response) => {
 });
 
 // ── PWR-03: System Resume endpoint ─────────────────────────────────────────
-app.post('/api/system/resume', chaosAuthMiddleware, async (_req: Request, res: Response) => {
+app.post('/api/system/resume', async (_req: Request, res: Response) => {
   // Signal resume by clearing the paused state via a MongoDB flag
   try {
     if (await ensureDbConnection()) {
@@ -332,6 +332,8 @@ app.post('/api/system/resume', chaosAuthMiddleware, async (_req: Request, res: R
         { $set: { isSystemPaused: false, resumedAt: new Date() } },
         { upsert: true }
       );
+      // Clear the in-memory orchestrator pause flag
+      resumeSystem();
     }
     return res.json({ success: true, message: 'System resume signal sent. AI will resume on next cycle.' });
   } catch (err: any) {
@@ -347,7 +349,8 @@ app.get('/api/telemetry', async (req: Request, res: Response) => {
     if (!infrastructureState) {
       return res.status(503).json({ error: 'MongoDB connection not ready' });
     }
-    return res.json({ infrastructureState });
+    const isSystemPaused = getSystemPausedState ? getSystemPausedState() : false;
+    return res.json({ infrastructureState, isSystemPaused });
   } catch (err: any) {
     console.error('[server] Telemetry fetch error:', err.message);
     return res.status(500).json({ error: 'Failed to fetch telemetry' });

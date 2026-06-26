@@ -10,3 +10,5 @@ export function getTokenUsage(): {
   estimatedCostUSD: number;
 };
 export function mapToClusterId(region: string): string;
+export function resumeSystem(): void;
+export function getSystemPausedState(): boolean;

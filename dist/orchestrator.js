@@ -791,7 +791,16 @@ ${liveEndpoints}
 // ─── Entrypoint Guard ──────────────────────────────────────────────────────────
 export async function bootOrchestrator() {
     console.error("[ORCHESTRATOR_BOOTSTRAP] Engine ignition. AI evaluation loop starting...");
-    executeEvaluationCycle(); // Run immediately on boot
-    setInterval(executeEvaluationCycle, resolvedPollingIntervalMs); // Run every 15 seconds
+    executeEvaluationCycle(false); // Run immediately on boot
+    setInterval(() => executeEvaluationCycle(false), resolvedPollingIntervalMs); // Run every 15 seconds
+}
+
+export function resumeSystem() {
+    isSystemPaused = false;
+    writeAiLog({ text: '[AI] Resume signal received. System unpaused. AI will evaluate on next cycle.', level: 'success', timestamp: new Date().toISOString(), architect: 'AetherNexus-Core' });
+}
+
+export function getSystemPausedState() {
+    return isSystemPaused;
 }
 //# sourceMappingURL=orchestrator.js.map
