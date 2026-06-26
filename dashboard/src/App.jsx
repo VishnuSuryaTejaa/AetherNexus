@@ -170,6 +170,10 @@ export default function App() {
               else if (cpu > 75) setStatuses(prev => ({ ...prev, [regionId]: 'WARNING_AMBER' }));
               else setStatuses(prev => ({ ...prev, [regionId]: 'NOMINAL_GREEN' }));
             });
+            if (data.isSystemPaused) {
+              setIsSystemPaused(true);
+              setPauseCountdown(300);
+            }
           }
         }).catch(err => console.error('Reconnect fetch failed', err));
     };
