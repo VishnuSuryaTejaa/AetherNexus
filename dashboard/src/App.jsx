@@ -132,11 +132,11 @@ export default function App() {
     euWestCluster: 'NOMINAL_GREEN',
     apSouthCluster: 'NOMINAL_GREEN'
   });
-  const [healingProgresses, setHealingProgresses] = useState<Record<string, number | null>>({});
+  const [healingProgresses, setHealingProgresses] = useState({});
   const [liveMetrics, setLiveMetrics] = useState({});
   // PWR-03: Track system paused state from AI broadcasts
   const [isSystemPaused, setIsSystemPaused] = useState(false);
-  const [pauseCountdown, setPauseCountdown] = useState<number | null>(null);
+  const [pauseCountdown, setPauseCountdown] = useState(null);
 
   const mitigationIntervals = useRef({});
 
@@ -161,7 +161,7 @@ export default function App() {
         .then(data => {
           if (data && data.infrastructureState) {
             setLiveMetrics(data.infrastructureState);
-            Object.entries(data.infrastructureState).forEach(([regionId, metrics]: [string, any]) => {
+            Object.entries(data.infrastructureState).forEach(([regionId, metrics]) => {
               const cpu = metrics?.currentLoadPercentage ?? metrics?.computeLoadPercentage ?? 0;
               const dbStatus = metrics?.status ?? metrics?.clusterOperationalStatus;
               if (dbStatus === 'HEALING') setStatuses(prev => ({ ...prev, [regionId]: 'HEALING' }));
@@ -287,7 +287,7 @@ export default function App() {
   }, []);
 
   // IMP-17: useCallback to prevent DevOpsControls re-render on every state change
-  const handleManualMitigate = useCallback(async (region: string) => {
+  const handleManualMitigate = useCallback(async (region) => {
     try {
       const res = await fetch(`${GATEWAY_URL}/api/mitigate`, {
         method: 'POST',
@@ -317,7 +317,7 @@ export default function App() {
   }, []);
 
   // BUG-A12 FIX: Use canonical color constants from AGENTS.md / skills.md
-  const colorMap: Record<string, string> = {
+  const colorMap = {
     NOMINAL_GREEN: '#00ff41',  // was #00ff00
     WARNING_AMBER: '#ffb000',
     CRITICAL_RED: '#ff003c',
@@ -486,8 +486,8 @@ export default function App() {
             <button
               onClick={handleExportLogs}
               style={{ marginTop: '8px', width: '100%', padding: '10px', background: 'transparent', border: '1px solid rgba(0,229,255,0.4)', color: 'rgba(0,229,255,0.7)', fontFamily: 'monospace', cursor: 'pointer', borderRadius: '4px', fontWeight: 'bold', letterSpacing: '1px', fontSize: '11px', transition: 'all 0.3s ease' }}
-              onMouseOver={(e: any) => { e.target.style.background = 'rgba(0,229,255,0.07)'; }}
-              onMouseOut={(e: any) => { e.target.style.background = 'transparent'; }}
+              onMouseOver={(e) => { e.target.style.background = 'rgba(0,229,255,0.07)'; }}
+              onMouseOut={(e) => { e.target.style.background = 'transparent'; }}
             >
               [ EXPORT LOGS ]
             </button>
