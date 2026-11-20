@@ -1,0 +1,662 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>V. Vishnu Surya Teja — AI/ML Engineer</title>
+    <meta name="description" content="AI/ML Engineer building LLM systems, agentic pipelines and full-stack AI products — from the dataset underneath to the interface on top. Hyderabad, India." />
+    <meta name="theme-color" content="#07080B" />
+    <meta name="color-scheme" content="dark" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="V. Vishnu Surya Teja — AI/ML Engineer" />
+    <meta property="og:description" content="LLM systems · Agentic pipelines · Full-stack AI integration." />
+    <!-- Replace with the absolute URL once deployed, e.g. https://your-domain/og.jpg -->
+    <meta property="og:image" content="./og.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <script>
+      document.documentElement.classList.add('js');
+      try {
+        var s = JSON.parse(localStorage.getItem('vst:display') || '{}');
+        if (typeof s.gi === 'number') document.documentElement.style.setProperty('--gi', s.gi);
+        var reduce = typeof s.motion === 'boolean' ? !s.motion : matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce) document.documentElement.dataset.motion = 'reduced';
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <!-- Live layers -->
+    <canvas class="gl" id="gl" aria-hidden="true"></canvas>
+    <div class="flabels" id="flabels" aria-hidden="true"></div>
+    <div class="scroll-edge" aria-hidden="true"></div>
+
+    <!-- Desktop / tablet navigation -->
+    <header class="topbar">
+      <nav class="nav glass" data-lg aria-label="Primary">
+        <a class="nav__brand" href="#top" aria-label="Back to top">
+          <span class="nav__mono">VST</span>
+        </a>
+        <div class="nav__links" data-droplet-group>
+          <span class="droplet" aria-hidden="true"></span>
+          <a href="#about" data-section="about">About</a>
+          <a href="#work" data-section="work">Work</a>
+          <a href="#experience" data-section="experience">Experience</a>
+          <a href="#skills" data-section="skills">Skills</a>
+          <a href="#contact" data-section="contact">Contact</a>
+        </div>
+        <a class="nav__cta" href="./Vishnu-Surya-Teja-Resume.pdf" download data-magnetic>
+          <span>Résumé</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14" /></svg>
+        </a>
+      </nav>
+    </header>
+
+    <main id="main">
+      <!-- ============================================================ HERO -->
+      <section class="hero" id="top" data-formation="0" aria-labelledby="hero-title">
+        <div class="container hero__inner">
+          <div class="hero__copy">
+            <p class="eyebrow mono" data-intro>
+              <span class="live-dot" aria-hidden="true"></span>
+              AI/ML Engineer — Hyderabad, India
+            </p>
+            <h1 class="hero__name" id="hero-title" data-intro-lines>
+              <span class="hero__line">Vishnu</span>
+              <span class="hero__line"><em class="serif">Surya</em> Teja</span>
+            </h1>
+            <p class="hero__lede" data-intro>
+              I build <strong>LLM systems</strong> and <strong>agentic pipelines</strong> that hold up in production — from the
+              dataset underneath to the interface on top.
+            </p>
+            <div class="hero__actions" data-intro>
+              <a class="btn btn--primary glass" data-lg data-magnetic href="#work">
+                <span>View selected work</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+              </a>
+              <a class="btn glass" data-lg data-magnetic href="./Vishnu-Surya-Teja-Resume.pdf" download>
+                <span>Download résumé</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14" /></svg>
+              </a>
+            </div>
+            <p class="status glass" data-intro>
+              <span class="status__pulse" aria-hidden="true"></span>
+              Open to AI/ML engineering roles <span class="status__sep" aria-hidden="true">·</span> B.Tech ’27
+            </p>
+          </div>
+
+          <div class="hero__stage" data-anchor="portrait">
+            <img class="hero__fallback" width="880" height="880" decoding="async"
+              alt="Portrait of Vishnu Surya Teja rendered as a field of glowing nano-particles" />
+            <div class="hud" aria-hidden="true">
+              <span class="hud__corner hud__corner--tl"></span><span class="hud__corner hud__corner--tr"></span>
+              <span class="hud__corner hud__corner--bl"></span><span class="hud__corner hud__corner--br"></span>
+              <span class="hud__tag hud__tag--tl mono">SEED 0x5EED</span>
+              <span class="hud__tag hud__tag--tr mono">STEP <b id="hud-step">00</b>/50</span>
+              <span class="hud__tag hud__tag--bl mono">σ <b id="hud-sigma">2.600</b></span>
+              <span class="hud__tag hud__tag--br mono">N <b id="hud-n">—</b></span>
+            </div>
+          </div>
+        </div>
+        <p class="hero__hint mono" aria-hidden="true"><span class="hint-dot"></span><span class="hint-text">Move across the portrait to add noise</span></p>
+        <a class="scroll-cue mono" href="#about" aria-label="Scroll to About">
+          <span class="scroll-cue__track"><span class="scroll-cue__thumb"></span></span>
+          Scroll
+        </a>
+      </section>
+
+      <!-- Tech marquee -->
+      <div class="marquee glass" aria-label="Core tools">
+        <div class="marquee__track">
+          <ul class="marquee__list mono">
+            <li>PyTorch</li><li>TensorFlow</li><li>LangGraph</li><li>LangChain</li><li>RAG</li><li>ChromaDB</li><li>Hugging Face</li>
+            <li>Legal-BERT</li><li>Gemini Live API</li><li>Groq</li><li>FastAPI</li><li>Supabase · pgvector</li><li>React</li><li>Docker</li><li>AWS</li>
+          </ul>
+          <ul class="marquee__list mono" aria-hidden="true">
+            <li>PyTorch</li><li>TensorFlow</li><li>LangGraph</li><li>LangChain</li><li>RAG</li><li>ChromaDB</li><li>Hugging Face</li>
+            <li>Legal-BERT</li><li>Gemini Live API</li><li>Groq</li><li>FastAPI</li><li>Supabase · pgvector</li><li>React</li><li>Docker</li><li>AWS</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- ============================================================ ABOUT -->
+      <section class="section about" id="about" data-formation="1" aria-labelledby="about-title">
+        <div class="container about__grid">
+          <div class="about__main">
+            <p class="section-label mono" data-reveal><span>01</span> About</p>
+            <h2 class="visually-hidden" id="about-title">About</h2>
+            <p class="statement" data-words>
+              I follow the gap between what foundation models can do in <em class="serif tone-amber">research</em> and what
+              holds up in <em class="serif tone-ice">production</em> — because that gap is where the most interesting
+              engineering lives.
+            </p>
+            <div class="about__copy" data-reveal>
+              <p>
+                I'm an AI/ML engineer who works across the full stack of a machine-learning product — from dataset
+                construction and model training through to RAG pipelines, agentic systems and the frontend a user actually
+                touches.
+              </p>
+              <p>
+                PyTorch, TensorFlow, Scikit-learn or LangChain — I use whatever the problem needs, and when the dataset
+                doesn't exist yet, I build the pipeline underneath it. An active learner with a creative streak, looking for
+                a role where I can own a problem end-to-end.
+              </p>
+            </div>
+            <ol class="pipeline" aria-label="How I work across the ML stack">
+              <li class="pipeline__step glass" data-reveal><span class="mono">01</span><strong>Data</strong><small>Custom datasets from scratch</small></li>
+              <li class="pipeline__step glass" data-reveal><span class="mono">02</span><strong>Train</strong><small>PyTorch · TensorFlow · Transformers</small></li>
+              <li class="pipeline__step glass" data-reveal><span class="mono">03</span><strong>Retrieve</strong><small>RAG · ChromaDB · pgvector</small></li>
+              <li class="pipeline__step glass" data-reveal><span class="mono">04</span><strong>Orchestrate</strong><small>LangGraph multi-agent systems</small></li>
+              <li class="pipeline__step glass" data-reveal><span class="mono">05</span><strong>Ship</strong><small>React · FastAPI · Docker · AWS</small></li>
+            </ol>
+          </div>
+          <div class="about__visual" data-anchor="gap" aria-hidden="true"></div>
+        </div>
+
+        <div class="container">
+          <ul class="stats" aria-label="Proof points">
+            <li class="stat glass glass--panel" data-reveal>
+              <span class="stat__num"><span data-count="88">88</span>%</span>
+              <span class="stat__label">recall on predatory-clause detection</span>
+              <span class="stat__src mono">LexiGuard</span>
+            </li>
+            <li class="stat glass glass--panel" data-reveal>
+              <span class="stat__num">&lt;<span data-count="300" data-from="1200">300</span><small>ms</small></span>
+              <span class="stat__label">audio latency on a native multimodal voice pipeline</span>
+              <span class="stat__src mono">TalentOps</span>
+            </li>
+            <li class="stat glass glass--panel" data-reveal>
+              <span class="stat__num">~<span data-count="70">70</span>%</span>
+              <span class="stat__label">less daily job-search effort</span>
+              <span class="stat__src mono">Vorkos</span>
+            </li>
+            <li class="stat glass glass--panel" data-reveal>
+              <span class="stat__num"><span data-count="6">6</span>+</span>
+              <span class="stat__label">production web apps designed and shipped</span>
+              <span class="stat__src mono">Mallurus Industry</span>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ============================================================ WORK -->
+      <section class="section work" id="work" data-formation="2" aria-labelledby="work-title">
+        <div class="container">
+          <header class="section-head">
+            <p class="section-label mono" data-reveal><span>02</span> Selected work</p>
+            <h2 class="section-title" id="work-title" data-split>Systems I've designed, <em class="serif">trained</em> and shipped.</h2>
+            <p class="section-intro" data-reveal>
+              Four projects, each built around a hard constraint — latency, hallucination, relevance, or data that simply
+              didn't exist.
+            </p>
+          </header>
+
+          <div class="deck">
+            <!-- 01 TalentOps -->
+            <article class="project glass glass--panel" id="p-talentops" data-lg style="--i: 0">
+              <div class="project__visual" aria-hidden="true" data-reveal>
+                <svg class="diagram" viewBox="0 0 480 400">
+                  <rect width="480" height="400" fill="url(#dgrid)" />
+                  <g class="d-edges">
+                    <path id="to-e1" class="d-line" d="M240 190 L240 55" />
+                    <path id="to-e2" class="d-line" d="M240 190 L368 148" />
+                    <path id="to-e3" class="d-line d-line--hot" d="M240 190 L319 299" />
+                    <path id="to-e4" class="d-line" d="M240 190 L161 299" />
+                    <path id="to-e5" class="d-line" d="M240 190 L112 148" />
+                    <path class="d-line d-dash" d="M343 312 C 380 330, 392 340, 400 352" />
+                  </g>
+                  <g class="d-packets">
+                    <circle r="2.6" class="d-pkt"><animateMotion dur="2.6s" repeatCount="indefinite"><mpath href="#to-e1" /></animateMotion></circle>
+                    <circle r="2.6" class="d-pkt"><animateMotion dur="2.9s" begin="0.5s" repeatCount="indefinite"><mpath href="#to-e2" /></animateMotion></circle>
+                    <circle r="2.6" class="d-pkt d-pkt--ice"><animateMotion dur="2.2s" begin="0.2s" repeatCount="indefinite"><mpath href="#to-e3" /></animateMotion></circle>
+                    <circle r="2.6" class="d-pkt"><animateMotion dur="3.1s" begin="1s" repeatCount="indefinite"><mpath href="#to-e4" /></animateMotion></circle>
+                    <circle r="2.6" class="d-pkt"><animateMotion dur="2.7s" begin="1.4s" repeatCount="indefinite"><mpath href="#to-e5" /></animateMotion></circle>
+                  </g>
+                  <g class="d-node d-node--hub" transform="translate(240 190)">
+                    <circle r="44" class="d-ring" />
+                    <circle r="36" />
+                    <text y="-3" class="d-title" text-anchor="middle">Manager</text>
+                    <text y="13" class="d-label" text-anchor="middle">LANGGRAPH</text>
+                  </g>
+                  <g class="d-node" transform="translate(240 55)"><circle r="22" /><text y="4" class="d-glyph" text-anchor="middle">S</text><text y="40" class="d-label" text-anchor="middle">SOURCING</text></g>
+                  <g class="d-node" transform="translate(368 148)"><circle r="22" /><text y="4" class="d-glyph" text-anchor="middle">Sc</text><text y="40" class="d-label" text-anchor="middle">SCHEDULING</text></g>
+                  <g class="d-node d-node--hot" transform="translate(319 299)"><circle r="22" /><text y="4" class="d-glyph" text-anchor="middle">I</text><text y="40" class="d-label" text-anchor="middle">INTERVIEWER</text></g>
+                  <g class="d-node" transform="translate(161 299)"><circle r="22" /><text y="4" class="d-glyph" text-anchor="middle">A</text><text y="40" class="d-label" text-anchor="middle">ANALYTICS</text></g>
+                  <g class="d-node" transform="translate(112 148)"><circle r="22" /><text y="4" class="d-glyph" text-anchor="middle">C</text><text y="40" class="d-label" text-anchor="middle">COMMS</text></g>
+                  <g class="d-lock" transform="translate(280 245)">
+                    <circle r="11" />
+                    <path d="M-4 -1 v-3 a4 4 0 0 1 8 0 v3" /><rect x="-5.5" y="-1" width="11" height="8" rx="2" />
+                  </g>
+                  <g class="d-voice" transform="translate(360 352)">
+                    <rect x="0" y="0" width="104" height="34" rx="17" />
+                    <g class="d-bars">
+                      <rect x="16" y="11" width="3" height="12" rx="1.5" /><rect x="24" y="8" width="3" height="18" rx="1.5" />
+                      <rect x="32" y="12" width="3" height="10" rx="1.5" /><rect x="40" y="6" width="3" height="22" rx="1.5" />
+                      <rect x="48" y="10" width="3" height="14" rx="1.5" /><rect x="56" y="13" width="3" height="8" rx="1.5" />
+                    </g>
+                    <text x="66" y="21" class="d-label">LIVE</text>
+                  </g>
+                  <text x="24" y="384" class="d-label d-label--dim">5 SUB-AGENTS · VOICE OWNERSHIP RULE</text>
+                </svg>
+              </div>
+              <div class="project__content" data-reveal>
+                <p class="project__meta mono"><span>01</span><span>Multi-agent system</span><span>Altrosyn · 2026</span></p>
+                <h3 class="project__title">TalentOps</h3>
+                <p class="project__lede">
+                  An AI recruitment system: five specialised sub-agents orchestrated with LangGraph, with a live voice
+                  interviewer on Google Meet.
+                </p>
+                <ul class="project__points">
+                  <li><strong>Native multimodal voice.</strong> Built on the Gemini Live API instead of chained STT/TTS, for sub-300&nbsp;ms audio latency; Vexa handles Meet transport.</li>
+                  <li><strong>Voice Ownership Rule.</strong> A session broker ensures the Manager and Interviewer agents never cross-speak or share voice context.</li>
+                  <li><strong>Extractive Evaluation.</strong> Every competency score must cite a validated verbatim transcript quote — no quote, no score.</li>
+                  <li><strong>Fairness &amp; Bias Lens.</strong> A k-anonymised heatmap correlates candidate cohorts with question difficulty.</li>
+                </ul>
+                <div class="project__foot">
+                  <p class="metric"><span class="metric__num">&lt;300<small>ms</small></span><span class="metric__label">voice latency</span></p>
+                  <ul class="chips" aria-label="Stack">
+                    <li>Python</li><li>FastAPI</li><li>LangGraph</li><li>Gemini Live</li><li>Groq · Whisper</li><li>Supabase · pgvector</li><li>Vexa</li>
+                  </ul>
+                </div>
+              </div>
+            </article>
+
+            <!-- 02 LexiGuard -->
+            <article class="project glass glass--panel" id="p-lexiguard" data-lg style="--i: 1">
+              <div class="project__visual" aria-hidden="true" data-reveal>
+                <svg class="diagram" viewBox="0 0 480 400">
+                  <rect width="480" height="400" fill="url(#dgrid)" />
+                  <path id="lg-p1" class="d-line" d="M102 200 C 128 200, 126 99, 150 99" />
+                  <path id="lg-p2" class="d-line" d="M102 200 C 128 200, 126 301, 150 301" />
+                  <path id="lg-p3" class="d-line" d="M320 99 C 352 99, 344 176, 352 186" />
+                  <path id="lg-p4" class="d-line" d="M320 301 C 352 301, 344 224, 352 214" />
+                  <path id="lg-p5" class="d-line d-line--hot" d="M402 200 L414 200" />
+                  <g class="d-packets">
+                    <circle r="2.6" class="d-pkt"><animateMotion dur="1.6s" repeatCount="indefinite"><mpath href="#lg-p1" /></animateMotion></circle>
+                    <circle r="2.6" class="d-pkt d-pkt--ice"><animateMotion dur="1.6s" begin="0.4s" repeatCount="indefinite"><mpath href="#lg-p2" /></animateMotion></circle>
+                    <circle r="2.6" class="d-pkt"><animateMotion dur="1.4s" begin="0.8s" repeatCount="indefinite"><mpath href="#lg-p3" /></animateMotion></circle>
+                    <circle r="2.6" class="d-pkt d-pkt--ice"><animateMotion dur="1.4s" begin="1.2s" repeatCount="indefinite"><mpath href="#lg-p4" /></animateMotion></circle>
+                  </g>
+                  <g class="d-doc" transform="translate(24 150)">
+                    <rect width="78" height="100" rx="12" />
+                    <path d="M14 24h50M14 38h42M14 52h50M14 66h30" />
+                    <rect class="d-doc__hl" x="10" y="45" width="58" height="14" rx="4" />
+                  </g>
+                  <text x="63" y="272" class="d-label" text-anchor="middle">CLAUSE</text>
+                  <g class="d-box" transform="translate(150 62)">
+                    <rect width="170" height="74" rx="16" />
+                    <text x="16" y="26" class="d-title">Lexical Sniper</text>
+                    <text x="16" y="42" class="d-label">TF-IDF + GRADIENT BOOST</text>
+                    <rect class="d-track" x="16" y="54" width="138" height="6" rx="3" />
+                    <rect class="d-fill d-fill--amber" x="16" y="54" width="86" height="6" rx="3" />
+                    <rect class="d-thresh" x="77" y="50" width="1.5" height="14" />
+                  </g>
+                  <g class="d-box" transform="translate(150 264)">
+                    <rect width="170" height="74" rx="16" />
+                    <text x="16" y="26" class="d-title">Semantic Brain</text>
+                    <text x="16" y="42" class="d-label">LEGAL-BERT</text>
+                    <rect class="d-track" x="16" y="54" width="138" height="6" rx="3" />
+                    <rect class="d-fill d-fill--ice" x="16" y="54" width="112" height="6" rx="3" />
+                    <rect class="d-thresh" x="77" y="50" width="1.5" height="14" />
+                  </g>
+                  <g class="d-node d-node--hot" transform="translate(377 200)">
+                    <circle r="25" />
+                    <text y="3" class="d-title" text-anchor="middle">MAX</text>
+                    <text y="44" class="d-label" text-anchor="middle">≥ 0.45</text>
+                  </g>
+                  <g class="d-flag" transform="translate(414 186)">
+                    <rect width="54" height="28" rx="14" />
+                    <text x="27" y="18" class="d-label d-label--bright" text-anchor="middle">FLAG</text>
+                  </g>
+                  <text x="24" y="384" class="d-label d-label--dim">MAXIMUM-THREAT LOGIC GATE · 88% RECALL</text>
+                </svg>
+              </div>
+              <div class="project__content" data-reveal>
+                <p class="project__meta mono"><span>02</span><span>NLP · Ensemble</span><span>Personal project</span></p>
+                <h3 class="project__title">LexiGuard</h3>
+                <p class="project__lede">A dual-brain legal clause detector that flags predatory clauses by fusing two very different models.</p>
+                <ul class="project__points">
+                  <li><strong>Lexical Sniper.</strong> TF-IDF + Gradient Boosting catches the surface patterns of risky language.</li>
+                  <li><strong>Semantic Brain.</strong> Legal-BERT reads for meaning when the wording is unusual.</li>
+                  <li><strong>Maximum-Threat Logic Gate.</strong> Fuses both brains at a 45% threshold, reaching 88% recall on clause detection.</li>
+                  <li><strong>Grounded explanations.</strong> Two React frontends on the Anthropic API use anti-hallucination chunking to stay tied to the source clause.</li>
+                </ul>
+                <div class="project__foot">
+                  <p class="metric"><span class="metric__num">88<small>%</small></span><span class="metric__label">recall</span></p>
+                  <ul class="chips" aria-label="Stack">
+                    <li>Python</li><li>NLP</li><li>Legal-BERT</li><li>Scikit-learn</li><li>React</li><li>Anthropic API</li>
+                  </ul>
+                </div>
+              </div>
+            </article>
+
+            <!-- 03 Vorkos -->
+            <article class="project glass glass--panel" id="p-vorkos" data-lg style="--i: 2">
+              <div class="project__visual" aria-hidden="true" data-reveal>
+                <svg class="diagram" viewBox="0 0 480 400">
+                  <rect width="480" height="400" fill="url(#dgrid)" />
+                  <g class="d-cloud">
+                    <circle cx="44" cy="132" r="3" /><circle cx="70" cy="118" r="2.4" /><circle cx="96" cy="140" r="3.2" /><circle cx="58" cy="160" r="2.2" />
+                    <circle cx="112" cy="168" r="2.6" /><circle cx="36" cy="188" r="3" /><circle cx="80" cy="186" r="2.4" /><circle cx="122" cy="206" r="3" />
+                    <circle cx="50" cy="214" r="2.6" /><circle cx="94" cy="226" r="3" /><circle cx="40" cy="246" r="2.2" /><circle cx="76" cy="256" r="3" />
+                    <circle cx="110" cy="250" r="2.4" /><circle cx="60" cy="282" r="2.6" /><circle cx="100" cy="280" r="2" /><circle cx="126" cy="132" r="2" />
+                  </g>
+                  <text x="80" y="322" class="d-label" text-anchor="middle">DISCOVER · TAVILY</text>
+                  <path class="d-funnel" d="M160 112 L282 172 L282 228 L160 288 Z" />
+                  <text x="221" y="205" class="d-title" text-anchor="middle">Groq</text>
+                  <text x="221" y="322" class="d-label" text-anchor="middle">FILTER</text>
+                  <path id="vk-p1" class="d-line" d="M130 200 L160 200 L282 200 L312 200" />
+                  <g class="d-packets">
+                    <circle r="2.6" class="d-pkt"><animateMotion dur="1.8s" repeatCount="indefinite"><mpath href="#vk-p1" /></animateMotion></circle>
+                    <circle r="2.6" class="d-pkt d-pkt--ice"><animateMotion dur="1.8s" begin="0.6s" repeatCount="indefinite"><mpath href="#vk-p1" /></animateMotion></circle>
+                    <circle r="2.6" class="d-pkt"><animateMotion dur="1.8s" begin="1.2s" repeatCount="indefinite"><mpath href="#vk-p1" /></animateMotion></circle>
+                  </g>
+                  <g class="d-rank" transform="translate(316 120)">
+                    <g class="d-row" style="--w: 0.94"><rect class="d-track" width="140" height="24" rx="8" /><rect class="d-fill d-fill--amber" width="131.6" height="24" rx="8" /><text x="10" y="16" class="d-label d-label--dark">FIT 0.94</text></g>
+                    <g class="d-row" transform="translate(0 36)" style="--w: 0.88"><rect class="d-track" width="140" height="24" rx="8" /><rect class="d-fill d-fill--amber" width="123.2" height="24" rx="8" /><text x="10" y="16" class="d-label d-label--dark">FIT 0.88</text></g>
+                    <g class="d-row" transform="translate(0 72)" style="--w: 0.79"><rect class="d-track" width="140" height="24" rx="8" /><rect class="d-fill d-fill--ice" width="110.6" height="24" rx="8" /><text x="10" y="16" class="d-label d-label--dark">FIT 0.79</text></g>
+                    <g class="d-row" transform="translate(0 108)" style="--w: 0.71"><rect class="d-track" width="140" height="24" rx="8" /><rect class="d-fill d-fill--ice" width="99.4" height="24" rx="8" /><text x="10" y="16" class="d-label d-label--dark">FIT 0.71</text></g>
+                  </g>
+                  <text x="386" y="322" class="d-label" text-anchor="middle">RANK · RAG FIT SCORE</text>
+                  <g class="d-resume" transform="translate(372 52)">
+                    <rect width="28" height="36" rx="6" /><path d="M7 12h14M7 18h10M7 24h14" />
+                  </g>
+                  <path class="d-line d-dash" d="M386 92 L386 116" />
+                  <text x="408" y="74" class="d-label">RÉSUMÉ</text>
+                  <text x="24" y="384" class="d-label d-label--dim">CHROMADB RAG · FIT-SCORING, NOT KEYWORDS</text>
+                </svg>
+              </div>
+              <div class="project__content" data-reveal>
+                <p class="project__meta mono"><span>03</span><span>Agentic pipeline · RAG</span><span>Personal project</span></p>
+                <h3 class="project__title">Vorkos</h3>
+                <p class="project__lede">An agentic job aggregator — a full discovery-to-ranking pipeline that automates the manual job search right up to the apply step.</p>
+                <ul class="project__points">
+                  <li><strong>Live discovery.</strong> Tavily scrapes openings in real time; the Groq API handles intelligent filtering.</li>
+                  <li><strong>Fit scoring, not keywords.</strong> RAG over ChromaDB scores every role against the candidate's actual résumé profile.</li>
+                  <li><strong>Measured impact.</strong> Cut daily job-search effort by roughly 70%.</li>
+                </ul>
+                <div class="project__foot">
+                  <p class="metric"><span class="metric__num">~70<small>%</small></span><span class="metric__label">less search effort</span></p>
+                  <ul class="chips" aria-label="Stack">
+                    <li>Python</li><li>Flask</li><li>React</li><li>RAG</li><li>ChromaDB</li><li>Groq API</li><li>Tavily</li>
+                  </ul>
+                </div>
+              </div>
+            </article>
+
+            <!-- 04 Data Vacuum -->
+            <article class="project glass glass--panel" id="p-datavacuum" data-lg style="--i: 3">
+              <div class="project__visual" aria-hidden="true" data-reveal>
+                <svg class="diagram" viewBox="0 0 480 400">
+                  <rect width="480" height="400" fill="url(#dgrid)" />
+                  <path id="dv-main" class="d-line" d="M84 122 L240 122 L396 122 L396 196 L300 196 L300 280 L372 280" />
+                  <path id="dv-rej" class="d-line d-dash" d="M84 122 L240 122 L396 122 L396 196 L300 196 L300 280 L150 280 L150 330" />
+                  <g class="d-packets">
+                    <circle r="2.6" class="d-pkt"><animateMotion dur="3.4s" repeatCount="indefinite"><mpath href="#dv-main" /></animateMotion></circle>
+                    <circle r="2.6" class="d-pkt d-pkt--ice"><animateMotion dur="3.4s" begin="0.85s" repeatCount="indefinite"><mpath href="#dv-main" /></animateMotion></circle>
+                    <circle r="2.4" class="d-pkt d-pkt--rej"><animateMotion dur="3.8s" begin="1.7s" repeatCount="indefinite"><mpath href="#dv-rej" /></animateMotion></circle>
+                    <circle r="2.6" class="d-pkt"><animateMotion dur="3.4s" begin="2.55s" repeatCount="indefinite"><mpath href="#dv-main" /></animateMotion></circle>
+                  </g>
+                  <g class="d-box" transform="translate(28 96)"><rect width="112" height="52" rx="14" /><text x="14" y="23" class="d-title">Prompts</text><text x="14" y="39" class="d-label">GROQ API</text></g>
+                  <g class="d-box" transform="translate(184 96)"><rect width="112" height="52" rx="14" /><text x="14" y="23" class="d-title">Scrape</text><text x="14" y="39" class="d-label">TAVILY</text></g>
+                  <g class="d-box" transform="translate(340 96)"><rect width="112" height="52" rx="14" /><text x="14" y="23" class="d-title">Clean</text><text x="14" y="39" class="d-label">NLP LAYER</text></g>
+                  <g class="d-gate" transform="translate(300 280)">
+                    <rect x="-22" y="-22" width="44" height="44" rx="10" transform="rotate(45)" />
+                    <text y="4" class="d-label d-label--bright" text-anchor="middle">ML</text>
+                  </g>
+                  <text x="300" y="334" class="d-label" text-anchor="middle">RELEVANCE GATE</text>
+                  <g class="d-grid-out" transform="translate(378 238)">
+                    <rect x="0" y="0" width="14" height="14" rx="3" /><rect x="18" y="0" width="14" height="14" rx="3" /><rect x="36" y="0" width="14" height="14" rx="3" /><rect x="54" y="0" width="14" height="14" rx="3" />
+                    <rect x="0" y="18" width="14" height="14" rx="3" /><rect x="18" y="18" width="14" height="14" rx="3" /><rect x="36" y="18" width="14" height="14" rx="3" /><rect x="54" y="18" width="14" height="14" rx="3" />
+                    <rect x="0" y="36" width="14" height="14" rx="3" /><rect x="18" y="36" width="14" height="14" rx="3" /><rect x="36" y="36" width="14" height="14" rx="3" /><rect x="54" y="36" width="14" height="14" rx="3" />
+                    <rect x="0" y="54" width="14" height="14" rx="3" /><rect x="18" y="54" width="14" height="14" rx="3" /><rect x="36" y="54" width="14" height="14" rx="3" /><rect x="54" y="54" width="14" height="14" rx="3" />
+                    <rect x="0" y="72" width="14" height="14" rx="3" /><rect x="18" y="72" width="14" height="14" rx="3" /><rect x="36" y="72" width="14" height="14" rx="3" /><rect x="54" y="72" width="14" height="14" rx="3" />
+                  </g>
+                  <text x="412" y="346" class="d-label" text-anchor="middle">DATASET</text>
+                  <text x="150" y="350" class="d-label d-label--dim" text-anchor="middle">OFF-TOPIC ✕</text>
+                  <text x="24" y="384" class="d-label d-label--dim">END-TO-END · NO MANUAL CURATION</text>
+                </svg>
+              </div>
+              <div class="project__content" data-reveal>
+                <p class="project__meta mono"><span>04</span><span>Data engineering</span><span>Personal project</span></p>
+                <h3 class="project__title">Data Vacuum</h3>
+                <p class="project__lede">Niche datasets simply don't exist on public repositories — so this pipeline collects and validates custom training data from scratch.</p>
+                <ul class="project__points">
+                  <li><strong>Targeted collection.</strong> The Groq API writes search prompts, Tavily scrapes the raw web content, and an NLP layer cleans it into a training-ready format.</li>
+                  <li><strong>ML relevance gate.</strong> A classification model admits only high-quality, on-topic samples, keeping each dataset tightly scoped.</li>
+                  <li><strong>Zero hand-labelling.</strong> End-to-end automated, with no manual curation.</li>
+                </ul>
+                <div class="project__foot">
+                  <p class="metric"><span class="metric__num">0</span><span class="metric__label">manual curation steps</span></p>
+                  <ul class="chips" aria-label="Stack">
+                    <li>Python</li><li>NLP</li><li>Groq API</li><li>Tavily</li><li>Scikit-learn</li>
+                  </ul>
+                </div>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ EXPERIENCE -->
+      <section class="section experience" id="experience" data-formation="2" aria-labelledby="exp-title">
+        <div class="container">
+          <header class="section-head">
+            <p class="section-label mono" data-reveal><span>03</span> Experience</p>
+            <h2 class="section-title" id="exp-title" data-split>Where I've <em class="serif">shipped</em>.</h2>
+          </header>
+          <div class="exp__grid">
+            <ol class="timeline">
+              <li class="timeline__progress" aria-hidden="true"></li>
+              <li class="role glass glass--panel" data-reveal>
+                <p class="role__when mono">Jun 2026 — Aug 2026 · Remote</p>
+                <h3 class="role__title">AIML Intern <span class="role__org">· Altrosyn</span></h3>
+                <ul class="role__points">
+                  <li>Built TalentOps on a FastAPI monolith, orchestrated end-to-end with LangGraph across five sub-agents: Sourcing, Scheduling, Interviewer, Analytics and Communication.</li>
+                  <li>Designed a zero-cost native multimodal voice pipeline on the Gemini Live API — sub-300&nbsp;ms audio latency — backed by Supabase + pgvector for agent state and candidate embeddings.</li>
+                  <li>Enforced a Voice Ownership Rule through a FastAPI session broker, and built an Extractive Evaluation protocol that eliminates hallucinated scores.</li>
+                  <li>Built a Fairness &amp; Bias Lens as a detective control against unintentional bias.</li>
+                </ul>
+                <ul class="chips" aria-label="Stack"><li>FastAPI</li><li>LangGraph</li><li>Gemini Live API</li><li>Supabase</li><li>pgvector</li></ul>
+              </li>
+              <li class="role glass glass--panel" data-reveal>
+                <p class="role__when mono">Nov 2024 — Sep 2025 · Remote</p>
+                <h3 class="role__title">Full-Stack AI Developer <span class="role__org">· Mallurus Industry Pvt Ltd</span></h3>
+                <ul class="role__points">
+                  <li>Designed and shipped 6+ production web applications — SPAs and e-commerce platforms — each optimised for measurably faster load times.</li>
+                  <li>Deployed a Groq-powered AI chatbot on a client-facing website, turning a static site into an interactive experience and improving visitor engagement.</li>
+                  <li>Delivered end-to-end — UI/UX, backend logic and AI integration — with consistent quality across a 10-month remote engagement.</li>
+                </ul>
+                <ul class="chips" aria-label="Stack"><li>React</li><li>SPAs</li><li>E-commerce</li><li>Groq API</li><li>UI/UX</li></ul>
+              </li>
+            </ol>
+            <aside class="edu glass glass--panel" data-reveal aria-labelledby="edu-title">
+              <p class="edu__label mono">Education</p>
+              <h3 class="edu__school" id="edu-title">SAI University</h3>
+              <p class="edu__degree">B.Tech in Computing &amp; Data Science <span>— AIML specialisation</span></p>
+              <p class="edu__when mono">Aug 2023 — May 2027 · Chennai, India</p>
+              <div class="edu__progress" aria-hidden="true"><span></span></div>
+              <p class="edu__sub mono">Key coursework</p>
+              <ul class="chips">
+                <li>Machine Learning</li><li>Deep Learning</li><li>Reinforcement Learning</li><li>NLP</li><li>MLOps</li><li>Data Structures &amp; Algorithms</li><li>Cryptography</li>
+              </ul>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ SKILLS -->
+      <section class="section skills" id="skills" data-formation="3" aria-labelledby="skills-title">
+        <div class="container skills__grid">
+          <div class="skills__aside">
+            <header class="section-head section-head--tight">
+              <p class="section-label mono" data-reveal><span>04</span> Capabilities</p>
+              <h2 class="section-title" id="skills-title" data-split>A toolkit chosen by <em class="serif">what the problem needs</em>.</h2>
+            </header>
+            <div class="skills__orb" data-anchor="sphere" aria-hidden="true"></div>
+          </div>
+          <ul class="bento" aria-label="Skill groups">
+            <li class="tile glass glass--panel" data-reveal>
+              <svg class="tile__icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2.5" /><circle cx="18" cy="6" r="2.5" /><circle cx="12" cy="18" r="2.5" /><path d="M8.5 6h7M7.2 8.3l3.6 7.4M16.8 8.3l-3.6 7.4" /></svg>
+              <h3>LLM &amp; Agentic Systems</h3>
+              <p>Multi-agent orchestration with LangGraph across five specialised agents; production RAG with LangChain + ChromaDB; Groq in a client chatbot and an agentic ranking pipeline. Prompt engineering is a core design layer.</p>
+              <p class="tile__proof mono">Proof → <a href="#p-talentops">TalentOps</a> · <a href="#p-vorkos">Vorkos</a></p>
+            </li>
+            <li class="tile glass glass--panel" data-reveal>
+              <svg class="tile__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18" /><path d="M6.5 6.5c1.6 5.5 3.6 8.3 6.6 9.3 2.3.8 4.6.7 7.4.7" /></svg>
+              <h3>Model Training &amp; Fine-tuning</h3>
+              <p>PyTorch, TensorFlow and Hugging Face Transformers for training, fine-tuning and inference. Legal-BERT as a semantic classification brain; Hugging Face Hub for model hosting.</p>
+              <p class="tile__proof mono">Proof → <a href="#p-lexiguard">LexiGuard</a></p>
+            </li>
+            <li class="tile glass glass--panel" data-reveal>
+              <svg class="tile__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 4.5h17l-6.5 7.5v6l-4 2v-8z" /></svg>
+              <h3>Data Engineering</h3>
+              <p>End-to-end custom dataset pipelines with Groq, Tavily, BeautifulSoup, spaCy, NLTK, regex and HF Tokenizers; Gensim for topic modelling and semantic representation.</p>
+              <p class="tile__proof mono">Proof → <a href="#p-datavacuum">Data Vacuum</a></p>
+            </li>
+            <li class="tile glass glass--panel" data-reveal>
+              <svg class="tile__icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="1.2" /></svg>
+              <h3>ML &amp; Classification</h3>
+              <p>A Scikit-learn phishing classifier with 22+ engineered features (87% accuracy); a TF-IDF + Gradient Boosting ⊕ Legal-BERT ensemble (88% recall); ML as a data-quality gate. Pandas as the wrangling layer everywhere.</p>
+              <p class="tile__proof mono">Proof → <a href="#p-lexiguard">LexiGuard</a> · <a href="#p-datavacuum">Data Vacuum</a></p>
+            </li>
+            <li class="tile glass glass--panel" data-reveal>
+              <svg class="tile__icon" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.8" /><path d="M4.5 5.5v13c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8v-13" /><path d="M4.5 12c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8" /></svg>
+              <h3>Data &amp; Storage</h3>
+              <p>ChromaDB as the vector backbone for RAG; Supabase + pgvector for agent state and candidate embeddings; PostgreSQL for relational and MongoDB for document workloads.</p>
+              <p class="tile__proof mono">Proof → <a href="#p-vorkos">Vorkos</a> · <a href="#p-talentops">TalentOps</a></p>
+            </li>
+            <li class="tile glass glass--panel" data-reveal>
+              <svg class="tile__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 3 8l9 4.5L21 8z" /><path d="m3 12.5 9 4.5 9-4.5" /><path d="m3 16.5 9 4.5 9-4.5" /></svg>
+              <h3>Full-Stack &amp; Deployment</h3>
+              <p>React frontends, Flask and FastAPI APIs and monoliths, AI backends in live client-facing apps. Docker, AWS (S3, EC2), Git/GitHub/DVC and Streamlit for internal tooling.</p>
+              <p class="tile__proof mono">Proof → <a href="#experience">Mallurus Industry</a></p>
+            </li>
+            <li class="tile glass glass--panel" data-reveal>
+              <svg class="tile__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.6 3.2 7.8 7.5 9 4.3-1.2 7.5-4.4 7.5-9V6z" /><path d="m9 12 2.2 2.2L15.5 10" /></svg>
+              <h3>Security</h3>
+              <p>OWASP Top 10 penetration testing with Burp Suite, Nmap and Wireshark, plus automated threat-scanning scripts.</p>
+            </li>
+            <li class="tile glass glass--panel" data-reveal>
+              <svg class="tile__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 20 7v9.5L12 21l-8-4.5V7z" /><path d="M12 11.5 20 7M12 11.5V21M12 11.5 4 7" /></svg>
+              <h3>Out of the Box</h3>
+              <p>Solutions from first principles when no template applies: custom dataset pipelines where public data fell short, novel feature engineering, and delivery from AI backend through to the client-facing product.</p>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ============================================================ CONTACT -->
+      <section class="section contact" id="contact" data-formation="4" aria-labelledby="contact-title">
+        <div class="container contact__inner">
+          <p class="section-label mono" data-reveal><span>05</span> Contact</p>
+          <h2 class="contact__title" id="contact-title" data-anchor="ring" data-split>
+            Let's build something that <em class="serif">holds up</em> in production.
+          </h2>
+          <p class="contact__lede" data-reveal>
+            Looking for a role where I can own a problem end-to-end — from the data pipeline to the interface. My inbox is
+            open.
+          </p>
+          <div class="contact__card glass glass--panel" data-lg data-reveal>
+            <img class="contact__avatar" src="./src/assets/portrait-avatar.webp" width="360" height="360" loading="lazy"
+              alt="Nano-halftone portrait of Vishnu Surya Teja" />
+            <div class="contact__body">
+              <div class="email">
+                <a class="email__addr" href="mailto:vishnusuryatejavst@gmail.com">vishnusuryatejavst@gmail.com</a>
+                <button class="email__copy glass" type="button" data-copy="vishnusuryatejavst@gmail.com">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="8.5" width="11" height="11" rx="3" /><path d="M15.5 5.5v-.5a2 2 0 0 0-2-2H6a2.5 2.5 0 0 0-2.5 2.5v7.5a2 2 0 0 0 2 2h.5" /></svg>
+                  <span>Copy</span>
+                </button>
+              </div>
+              <div class="contact__links">
+                <a class="btn glass" data-lg data-magnetic href="https://www.linkedin.com/in/vishnu-surya-teja-veeraganti-1b172827a" target="_blank" rel="noopener noreferrer">
+                  <span>LinkedIn</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8.5 7H17v8.5" /></svg>
+                </a>
+                <a class="btn glass" data-lg data-magnetic href="https://github.com/VishnuSuryaTejaa" target="_blank" rel="noopener noreferrer">
+                  <span>GitHub</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8.5 7H17v8.5" /></svg>
+                </a>
+                <a class="btn btn--primary glass" data-lg data-magnetic href="./Vishnu-Surya-Teja-Resume.pdf" download>
+                  <span>Résumé</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14" /></svg>
+                </a>
+              </div>
+              <p class="contact__meta mono">
+                <span class="live-dot" aria-hidden="true"></span> Hyderabad, India · <time id="ist-clock">--:--</time> IST
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container footer__inner">
+        <p class="mono">© 2026 V. Vishnu Surya Teja</p>
+        <p class="footer__made mono">Generated from noise · Three.js · GSAP · Liquid Glass</p>
+        <a class="footer__top mono" href="#top">Back to top ↑</a>
+      </div>
+    </footer>
+
+    <!-- Mobile tab bar (iOS-style) -->
+    <nav class="tabbar" aria-label="Sections">
+      <div class="tabbar__pill glass" data-lg data-droplet-group>
+        <span class="droplet" aria-hidden="true"></span>
+        <a href="#top" data-section="top">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11.2 12 4l8.5 7.2" /><path d="M6 9.8v9.7h12V9.8" /></svg><span>Home</span>
+        </a>
+        <a href="#work" data-section="work">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="2" /><rect x="13" y="4" width="7" height="7" rx="2" /><rect x="4" y="13" width="7" height="7" rx="2" /><rect x="13" y="13" width="7" height="7" rx="2" /></svg><span>Work</span>
+        </a>
+        <a href="#experience" data-section="experience">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2.4" /><circle cx="18" cy="6" r="2.4" /><path d="M8.4 18H15a3.5 3.5 0 0 0 0-7H9a3.5 3.5 0 0 1 0-7h6.6" /></svg><span>Path</span>
+        </a>
+        <a href="#skills" data-section="skills">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5c.6 4.2 2.3 5.9 6.5 6.5-4.2.6-5.9 2.3-6.5 6.5-.6-4.2-2.3-5.9-6.5-6.5 4.2-.6 5.9-2.3 6.5-6.5z" /><path d="M18.5 15.5c.2 1.6.9 2.3 2.5 2.5-1.6.2-2.3.9-2.5 2.5-.2-1.6-.9-2.3-2.5-2.5 1.6-.2 2.3-.9 2.5-2.5z" /></svg><span>Skills</span>
+        </a>
+        <a href="#contact" data-section="contact">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3.5" /><path d="m4.5 7.5 7.5 5.5 7.5-5.5" /></svg><span>Contact</span>
+        </a>
+      </div>
+    </nav>
+
+    <!-- iOS 27-style display control -->
+    <div class="gc" id="gc">
+      <div class="gc__panel glass glass--panel" id="gc-panel" role="dialog" aria-labelledby="gc-title" hidden>
+        <p class="gc__title" id="gc-title">Display</p>
+        <div class="gc__group">
+          <div class="gc__row">
+            <label for="gc-intensity">Liquid Glass</label>
+            <output class="mono" id="gc-out" for="gc-intensity">50%</output>
+          </div>
+          <div class="gc__slider">
+            <span class="mono">Clear</span>
+            <input id="gc-intensity" type="range" min="0" max="100" step="1" value="50" />
+            <span class="mono">Tinted</span>
+          </div>
+        </div>
+        <div class="gc__row gc__row--switch">
+          <span id="gc-motion-label">Motion &amp; particles</span>
+          <button class="switch" id="gc-motion" type="button" role="switch" aria-checked="true" aria-labelledby="gc-motion-label"><span></span></button>
+        </div>
+        <p class="gc__note mono">Intensity slider modelled on iOS 27</p>
+      </div>
+      <button class="gc__btn glass" data-lg id="gc-btn" type="button" aria-label="Display settings" aria-expanded="false" aria-controls="gc-panel">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2c3.7 4.3 6.2 7.7 6.2 10.8a6.2 6.2 0 0 1-12.4 0c0-3.1 2.5-6.5 6.2-10.8z" /><path class="gc__shine" d="M9.2 14.6a3 3 0 0 0 2.4 2.6" /></svg>
+      </button>
+    </div>
+
+    <p class="diffusion-chip mono" aria-hidden="true"><span class="live-dot"></span><span id="chip-formation">x₀ · portrait</span><span class="diffusion-chip__sigma">σ <b id="chip-sigma">0.00</b></span></p>
+    <div class="toast glass glass--panel" role="status" aria-live="polite"></div>
+
+    <!-- SVG defs: Liquid Glass refraction filters are generated into #lg-defs -->
+    <svg class="svg-defs" aria-hidden="true" focusable="false" width="0" height="0">
+      <defs id="lg-defs">
+        <pattern id="dgrid" width="16" height="16" patternUnits="userSpaceOnUse">
+          <circle cx="1" cy="1" r="0.9" fill="rgba(255,255,255,0.075)" />
+        </pattern>
+      </defs>
+    </svg>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

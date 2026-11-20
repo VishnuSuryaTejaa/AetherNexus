@@ -1,0 +1,147 @@
+/* ==========================================================================
+   Liquid Glass — iOS 27 refinement, rebuilt for the web
+
+   Stack (top → bottom)
+   · press glow ............ ::after — lights up from the touch point
+   · specular hairline ..... ::before — thin rim, brightest top-left
+   · volumetric shading .... --lg-spec — generated per element (ui/liquidGlass.js):
+                             squircle bezel lit from above → bright rim on top,
+                             internal reflection below, inner shadow for thickness
+   · tint .................. white fill driven by --gi (Clear 0 → Tinted 1);
+                             iOS 27 dark glass is lighter, so it tints with light
+   · backdrop .............. blur + saturation + lift; Chromium adds true
+                             refraction with RGB dispersion at the rim
+   · edges ................. 0.5px darkened outer edge (iOS 27), minimal shadow
+   Blur/saturation values are rewritten at runtime by the intensity slider.
+   ========================================================================== */
+
+/* Registered so the tint can transition smoothly on hover */
+@property --g-fill {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0.1;
+}
+
+/* Per-element shading map — must never leak into nested glass */
+@property --lg-spec {
+  syntax: "*";
+  inherits: false;
+}
+
+.glass {
+  --g-fill: calc(0.03 + var(--gi) * 0.15);
+  position: relative;
+  isolation: isolate;
+  background:
+    var(--lg-spec, none) center / 100% 100% no-repeat,
+    radial-gradient(130% 90% at 50% -20%, rgb(255 255 255 / calc(var(--g-fill) * 0.9)), transparent 60%),
+    linear-gradient(
+      180deg,
+      rgb(255 255 255 / calc(var(--g-fill) + 0.03)) 0%,
+      rgb(255 255 255 / var(--g-fill)) 45%,
+      rgb(255 255 255 / calc(var(--g-fill) * 0.7)) 100%
+    );
+  -webkit-backdrop-filter: blur(10px) saturate(1.78) brightness(1.06);
+  backdrop-filter: blur(10px) saturate(1.78) brightness(1.06);
+  box-shadow:
+    inset 0 1px 0 -0.25px rgb(255 255 255 / 0.62),
+    inset 0 -1px 0 -0.25px rgb(255 255 255 / 0.2),
+    inset 0 0 0 1px rgb(255 255 255 / calc(0.05 + var(--gi) * 0.05)),
+    0 0 0 0.5px rgb(0 0 0 / 0.68),
+    0 1px 2px rgb(0 0 0 / 0.22),
+    0 18px 40px -22px rgb(0 0 0 / 0.75);
+}
+
+/* Specular hairline: a 1px rim that catches light at the top-left and,
+   more faintly, the bottom-right — layered over the volumetric shading */
+.glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    162deg,
+    rgb(255 255 255 / 0.62) 0%,
+    rgb(255 255 255 / 0.18) 16%,
+    rgb(255 255 255 / 0.02) 38%,
+    rgb(255 255 255 / 0) 62%,
+    rgb(255 255 255 / 0.1) 84%,
+    rgb(255 255 255 / 0.34) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+/* Press illumination — the glass lights up from where it was touched */
+.glass::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    150px circle at var(--px, 50%) var(--py, 50%),
+    rgb(255 248 238 / 0.34),
+    rgb(255 248 238 / 0.1) 38%,
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 0.8s var(--ease-out);
+}
+
+:is(a, button).glass:active::after {
+  opacity: 1;
+  transition-duration: 0.08s;
+}
+
+/* Gel response: controls brighten on hover and bulge on press, then spring back */
+:is(a, button).glass {
+  transition: scale 0.55s var(--ease-spring), --g-fill 0.3s;
+}
+
+:is(a, button).glass:hover {
+  --g-fill: calc(0.06 + var(--gi) * 0.17);
+}
+
+:is(a, button).glass:active {
+  scale: 1.045;
+  transition-duration: 0.16s;
+}
+
+/* "Regular" glass for dense content — diffuses busy backgrounds harder (iOS 27) */
+.glass--panel {
+  --p-fill: calc(0.26 + var(--gi) * 0.46);
+  background:
+    var(--lg-spec, none) center / 100% 100% no-repeat,
+    radial-gradient(120% 70% at 50% -10%, rgb(255 255 255 / calc(0.06 + var(--gi) * 0.03)), transparent 55%),
+    rgb(16 18 25 / var(--p-fill));
+  -webkit-backdrop-filter: blur(26px) saturate(1.5) brightness(1.02);
+  backdrop-filter: blur(26px) saturate(1.5) brightness(1.02);
+}
+
+/* Prominent (tinted) glass — accent tint with a dark label for contrast */
+.glass.btn--primary {
+  color: #1b0e05;
+  background:
+    var(--lg-spec, none) center / 100% 100% no-repeat,
+    radial-gradient(120% 120% at 30% 0%, rgb(255 236 210 / 0.75), transparent 55%),
+    linear-gradient(180deg, rgb(255 196 128 / 0.92), rgb(255 146 66 / 0.88) 55%, rgb(255 110 46 / 0.9));
+  box-shadow:
+    inset 0 1px 0 -0.25px rgb(255 255 255 / 0.95),
+    inset 0 -1px 0 -0.25px rgb(255 255 255 / 0.45),
+    0 0 0 0.5px rgb(60 20 0 / 0.6),
+    0 14px 30px -14px rgb(255 110 40 / 0.65);
+}
+
+@supports not (scale: 1) {
+  :is(a, button).glass:active {
+    transform: scale(1.04);
+  }
+}
