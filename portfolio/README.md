@@ -37,5 +37,5 @@ npm run preview   # serve dist/ on http://localhost:5200
 
 ## Before deploying
 
-- **Social card:** set `og:image` in `index.html` to an absolute URL, for example `https://your-domain/og.jpg`.
+- **Live site:** https://vishnu-surya-teja-portfolio.vercel.app (Vercel project `vishnu-surya-teja-portfolio`, deployed from `portfolio/`). If the domain changes, update `og:url` and `og:image` in `index.html`.
 - **Phone number:** it is intentionally not shown on the page. The downloadable résumé in `public/` still contains it.
