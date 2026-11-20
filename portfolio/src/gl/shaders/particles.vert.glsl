@@ -1,5 +1,10 @@
+#version 300 es
 // Nano-particle morph — every transition is a diffusion step:
 //   x = mix(A, B, ease(t_i)) + sigma(t) * eps_i
+precision highp float;
+
+uniform mat4 uProj;
+uniform mat4 uView;
 uniform float uTime;
 uniform float uMorph;
 uniform float uSigma;
@@ -17,17 +22,18 @@ uniform float uMotion;
 uniform float uFade;
 uniform vec3 uPal[4];
 
-attribute vec3 aP1;
-attribute vec3 aP2;
-attribute vec3 aP3;
-attribute vec3 aP4;
-attribute vec4 aColor;
-attribute vec4 aTone;
-attribute vec4 aRand;
-attribute vec3 aEps;
+layout(location = 0) in vec3 aP0;
+layout(location = 1) in vec3 aP1;
+layout(location = 2) in vec3 aP2;
+layout(location = 3) in vec3 aP3;
+layout(location = 4) in vec3 aP4;
+layout(location = 5) in vec4 aColor;
+layout(location = 6) in vec4 aTone;
+layout(location = 7) in vec4 aRand;
+layout(location = 8) in vec3 aEps;
 
-varying vec3 vColor;
-varying float vAlpha;
+out vec3 vColor;
+out float vAlpha;
 
 const float PI = 3.141592653589793;
 
@@ -52,7 +58,7 @@ vec3 bridge(vec3 p) {
 }
 
 vec3 rawPos(int i) {
-  if (i == 0) return position; // portrait (formation 0) doubles as `position`
+  if (i == 0) return aP0;
   if (i == 1) return aRand.w > 0.5 ? bridge(aP1) : aP1;
   if (i == 2) return aP2;
   if (i == 3) return aP3;
@@ -70,6 +76,12 @@ vec3 baseColor(int i) {
 float baseBright(int i) {
   if (i == 0) return aColor.a;
   return 0.45 + 0.55 * aRand.y;
+}
+
+// The portrait holds still enough to read like a photograph; the abstract
+// formations breathe and twinkle freely
+float liveliness(int i) {
+  return i == 0 ? 0.3 : 1.0;
 }
 
 float baseSize(int i) {
@@ -92,27 +104,28 @@ void main() {
   float sigma = uSigma + sin(st * PI) * 0.6 * uMotion;
 
   vec3 breathe = vec3(sin(uTime * 0.7 + ph), cos(uTime * 0.6 + ph * 1.3), sin(uTime * 0.5 + ph * 0.7)) * 0.006 * uMotion;
-  vec3 pa = rawPos(a) + eps * sigma + breathe;
-  vec3 pb = rawPos(b) + eps * sigma + breathe;
+  vec3 pa = rawPos(a) + eps * sigma + breathe * liveliness(a);
+  vec3 pb = rawPos(b) + eps * sigma + breathe * liveliness(b);
   vec3 wa = uRot[a] * pa * uScl[a] + uOff[a];
   vec3 wb = uRot[b] * pb * uScl[b] + uOff[b];
   vec3 pos = mix(wa, wb, e);
 
   // Noise brush (screen space)
-  vec4 c0 = projectionMatrix * viewMatrix * vec4(pos, 1.0);
+  vec4 c0 = uProj * uView * vec4(pos, 1.0);
   vec2 suv = c0.xy / c0.w * 0.5 + 0.5;
-  float tch = smoothstep(0.05, 0.85, texture2D(uTouch, suv).r) * uTouchAmt;
+  float tch = smoothstep(0.05, 0.85, texture(uTouch, suv).r) * uTouchAmt;
   float scl = mix(uScl[a], uScl[b], e);
   vec2 away = pos.xy - uPointer;
   pos.xy += normalize(away + 1e-4) * tch * 0.16 * scl;
   pos += eps * tch * 0.1 * scl;
 
-  vec4 mv = viewMatrix * vec4(pos, 1.0);
-  gl_Position = projectionMatrix * mv;
+  vec4 mv = uView * vec4(pos, 1.0);
+  gl_Position = uProj * mv;
 
   float size = mix(uSizes[a] * baseSize(a), uSizes[b] * baseSize(b), e);
   float ps = size * uPixelRatio * (uCamZ / -mv.z) * (1.0 + tch * 0.5);
-  float tw = 1.0 - 0.22 * uMotion * (0.5 + 0.5 * sin(uTime * (1.1 + aRand.y * 2.4) + ph));
+  float twAmt = 0.22 * mix(liveliness(a), liveliness(b), e);
+  float tw = 1.0 - twAmt * uMotion * (0.5 + 0.5 * sin(uTime * (1.1 + aRand.y * 2.4) + ph));
   float bright = mix(baseBright(a) * uGains[a], baseBright(b) * uGains[b], e);
   float noiseDim = mix(1.0, 1.0 / (1.0 + sigma * 1.4), 0.65);
   vAlpha = bright * tw * noiseDim * uFade * (1.0 + tch * 0.9) * clamp(ps / 1.5, 0.3, 1.0);

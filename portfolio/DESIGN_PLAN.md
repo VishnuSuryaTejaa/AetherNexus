@@ -38,11 +38,11 @@ Benchmarks taken from the 2026 Awwwards portfolio listings:
 | Weakness | Our design move |
 |---|---|
 | Decorative particles | **The particle system is a diffusion model.** The portrait is denoised from Gaussian noise (σ → 0 over 50 "steps"). Each later section re-generates a new formation from noise. The cursor is a noise brush: it adds σ locally, and the particles denoise back. The motif is the engineer's own craft. |
-| Legibility vs. spectacle | **iOS 27 Liquid Glass.** It includes Apple's new Clear ↔ Tinted intensity slider, so visitors control contrast. Content panels use the denser "regular" glass and controls use "clear" glass. |
-| Blocking loaders | **No splash screen.** HTML text is readable in the first paint. Three.js loads lazily, and the denoise intro plays *behind* text that's already visible. |
+| Legibility vs. spectacle | **iOS 27 Liquid Glass.** Content panels use the denser "regular" glass and controls use "clear" glass, so copy stays legible over the live particle field. |
+| Blocking loaders | **No splash screen.** HTML text is readable in the first paint. The hand-written WebGL2 engine (≈ 13 KB gzip) loads after first paint, and the denoise intro plays *behind* text that's already visible. |
 | Pictures, not decisions | **Evidence-first project cards.** Each card shows a one-line problem, an animated architecture diagram, key decisions and a headline metric. |
-| Mobile afterthought | **A native iOS pattern on phones.** A floating Liquid Glass tab bar sits at the bottom, with a gel "droplet" selection and a separate round control button, as in iOS 26/27. |
-| Accessibility | Honours `prefers-reduced-motion` plus an in-page Motion switch. Uses semantic landmarks, a skip link, visible focus and AA contrast. Content stays real HTML for SEO. |
+| Mobile afterthought | **A native iOS pattern on phones.** A floating Liquid Glass tab bar sits at the bottom, and its selection is a drop of liquid that flows from tab to tab, as in iOS 26/27. |
+| Accessibility | Honours `prefers-reduced-motion` (formations snap, the liquid selection jumps). Uses semantic landmarks, a skip link, visible focus and AA contrast. Content stays real HTML for SEO. |
 
 ## 3. Information architecture (all content from the résumé)
 
@@ -57,17 +57,18 @@ The phone number is deliberately left off the page; the résumé PDF stays avail
 
 ## 4. Visual system
 
-**Palette: golden hour × blue hour.** It comes straight from the photo: warm key light, the ember stitch on the collar, the cream tee, and a cool rim light.
+**Palette: moonlight.** Navy shadows rise through electric blue to frost highlights, with a violet rim light: cool and precise, so the portrait reads like a photograph lit by a screen at night.
 
 | Token | Hex | Use |
 |---|---|---|
-| night | `#07080B` | page |
-| ink | `#0E1016` | panels |
-| ember | `#FF6B2C` | primary accent, live states |
-| amber | `#FFB35C` | highlights, metrics |
-| cream | `#FFF1DC` | brightest particles |
-| ice | `#8FD0FF` | rim light, noise, secondary |
-| text / muted | `#F5F0E8` / `#9C978F` | copy |
+| night | `#05070D` | page |
+| ink | `#0C1120` | panels |
+| accent | `#6AA8FF` | primary accent, live states |
+| accent-2 | `#A18BFF` | violet rim light, highlights |
+| accent-deep | `#3D6BFF` | prominent (tinted) buttons |
+| frost | `#EAF3FF` | brightest particles |
+| ice | `#8FD6FF` | noise tint, secondary |
+| text / muted | `#EEF2F8` / `#8E97A8` | copy |
 
 **Type**
 - **Geist Variable:** display and UI. Large and tight: −0.04 em tracking.
@@ -82,18 +83,24 @@ The phone number is deliberately left off the page; the résumé PDF stays avail
 Built in layers, all derived from one physical model, a convex-squircle bezel (Apple's preferred surface profile):
 
 1. **Volumetric bezel shading (every browser).** Each glass element gets its own shading map, generated at its exact size. The bezel's surface normals are lit from above (iOS 27's vertical light angle). That gives a bright specular rim where the edge faces the light, a softer internal reflection on the opposite edge, and a faint inner shadow for thickness. This is what separates Liquid Glass from flat "glassmorphism".
-2. **Refraction (Chromium).** The same normals bend the backdrop through Snell's law (n = 1.5) via an SVG displacement map used as a `backdrop-filter`. Smaller controls also split R/G/B for the faint dispersion fringe real glass shows at its rim. Clear controls keep only a light frost so the lensing stays visible.
-3. **Tint fill:** white α ≈ 0.03 → 0.18, driven by the intensity slider. iOS 27 dark glass is lighter, so we tint with light rather than black. Dense content panels use the stronger "regular" glass for legibility.
+2. **Refraction (Chromium, fine pointers).** The same normals bend the backdrop through Snell's law (n = 1.5) via an SVG displacement map used as a `backdrop-filter`. On strong GPUs, smaller controls also split R/G/B for the faint dispersion fringe real glass shows at its rim.
+3. **Tint fill:** a light white fill (α ≈ 0.1). iOS 27 dark glass is lighter, so we tint with light rather than black. Dense content panels use the stronger "regular" glass for legibility.
 4. **Specular hairline + darkened edge:** a 1 px rim brightest at the top-left, plus the 0.5 px darkened outer ring that is new in iOS 27. Shadows are kept minimal.
-5. **Touch response (no pointer tracking).** Glass lights up from the exact point you press it and bulges with a spring (iOS 26/27 behaviour). The gel droplet indicator squashes and stretches between nav items.
-6. **Intensity slider:** Clear ↔ Tinted, defaulting to the midpoint as Apple does. It persists between visits.
-7. **Scroll edge:** a soft tonal fade under the floating nav, with no frost of its own, so the nav's refraction of the content sliding beneath it stays visible.
+5. **Touch response (no pointer tracking).** Glass lights up from the exact point you press it and bulges with a spring (iOS 26/27 behaviour).
+6. **Scroll edge:** a soft tonal fade under the floating nav, with no frost of its own, so the nav's refraction of the content sliding beneath it stays visible.
 
-Maps are generated off the critical path (about 5 ms each, at most 8 ms of work per frame) from ResizeObserver measurements, so they never force a layout.
+Maps are generated in a Web Worker from ResizeObserver measurements (only for glass near the viewport), so they never force a layout.
+
+### 5a. Navigation: glass groups and a liquid selection
+
+- **Structure.** The desktop bar is three floating glass pieces, like iOS 27 toolbar groups: the monogram, a capsule of section links, and the tinted Résumé button. On phones the monogram and Résumé sit in the top corners and the sections move to the bottom tab bar.
+- **The selection is a drop of gel.** When the active section changes, a stiff *head* races to the new item while a soft *tail* drains after it. The drop stretches, pinches a waist, necks into a capillary thread on long moves, squashes against the capsule wall if it overshoots, and lands with a jelly wobble. Pressing an item makes the gel swell and jiggle.
+- **How it's drawn.** The outline is a 1-D thickness profile r(x): two round-capped pills plus the thread, joined with smooth maxima so every join is a meniscus. It is rendered as plain SVG paths (body, rim, gloss, shade), so it stays vector-crisp at any zoom. No filters are used, and nothing runs once the drop settles.
 
 ## 6. Nano-particle engine
 
-- **Stack:** Three.js r187 (WebGL2). One `THREE.Points` draw call with a custom `ShaderMaterial`. Morphing is stateless and runs on the GPU, so it is deterministic and scrubs perfectly back and forth.
+- **Stack:** hand-written WebGL2 (no Three.js), GLSL ES 3.00 shaders linked in parallel (`KHR_parallel_shader_compile`). One points draw call. Morphing is stateless and runs on the GPU, so it is deterministic and scrubs perfectly back and forth.
+- **Off the main thread:** a Web Worker fetches and decodes the portrait and builds every formation. A second worker probes the GPU (`OffscreenCanvas`), and software rasterisers get the static portrait instead of a stuttering one.
 - **Formations** (each a vec3 attribute):
   - Portrait: 2.5D relief from luminance plus a head ellipsoid.
   - The Gap: a research nebula, a production lattice, and procedural bridge streams flowing between them.
@@ -101,53 +108,56 @@ Maps are generated off the critical path (about 5 ms each, at most 8 ms of work 
   - Latent sphere: a Fibonacci shell plus orbit rings.
   - Signal ring: the contact portal.
 - **Transition = a diffusion step:** `x = mix(A, B, ease(tᵢ)) + σ(t)·εᵢ`. σ peaks mid-transition, with a per-particle stagger.
-- **Intro = reverse diffusion:** σ eases 2.6 → 0 over about 2.8 s, while the HUD counts steps 01 → 50.
+- **Intro = reverse diffusion** on the Karras schedule (σ 2.6 → 0.002, ρ = 7), 50 steps over 3 s, while the HUD counts the steps.
 - **Noise brush:** the cursor paints a fading screen-space touch texture. It adds local σ, a push and an ice-blue tint, then the particles re-denoise. It works on every formation, and on touch screens too.
-- **Ambient dust:** 2–6 k nano particles with infinite scroll parallax, so every section has living background motion.
-- **Post-processing:** HDR render target, bloom, subtle chromatic aberration, vignette, film grain and ACES tone mapping.
+- **Ambient dust:** 0.9–4.2 k nano particles with infinite scroll parallax.
+- **Post-processing:** HDR (RGBA16F) render target, quarter-resolution bloom (bright pass plus separable blur), ACES tone mapping, vignette and film grain.
 - **Adaptive quality:**
-  - Four tiers (≈18 k → 90 k particles), chosen by GPU, cores, memory and viewport.
-  - A 1.5 s FPS probe thins the draw range if frames drop. Particles are pre-shuffled, so a prefix is a uniform subsample.
-  - DPR is clamped to ≤ 1.75.
-  - Rendering pauses when the tab is hidden.
+  - Five budgets, from ≈ 22 k particles (low-end phones) to ≈ 90 k (strong desktop GPUs), chosen by GPU class, cores, memory and viewport.
+  - The engine draws on the system's default GPU. Asking for the high-performance one makes dual-GPU Macs switch chips, which blocked the main thread for ~0.2 s on every load (≈ 0.7 s under Lighthouse's 4× CPU throttling) and costs battery.
+  - The canvas renders at the display's own pixel ratio (up to 2×) within a per-budget megapixel cap, so the portrait is Retina-sharp and 4K/5K screens still start in budget.
+  - Frames are paced at 60 fps in motion and 30 fps at rest.
+  - If frames still run long, an FPS probe steps down: resolution first, then bloom, then particle count. Particles are pre-shuffled, so a prefix is a uniform subsample, and dot size compensates so brightness holds.
+  - Measured at 2880 × 1800: Intel UHD 630 ≈ 10 ms of GPU per frame (59 k particles), Radeon Pro 555X ≈ 5.5 ms (74 k).
 - **Fallbacks:** without WebGL2, a static "nano-halftone" portrait. With reduced motion, formations snap per section with a short fade, and there's no jitter, drift or brush.
 
 ## 7. Creative portrait treatment
 
-1. **Live particle portrait.** The transparent cutout is resampled into a jittered grid of particles:
+1. **Live particle portrait.** The transparent cutout is resampled into a jittered grid of particles, one per cell:
    - Size and brightness follow light.
-   - A golden-hour gradient map runs ember → amber → cream.
-   - An ice-blue rim light is detected from the alpha edge.
+   - A moonlight gradient map runs navy → electric blue → frost.
+   - A violet rim light is detected from the alpha edge.
    - A focus falloff keeps the face as the hero.
+   - The portrait breathes and twinkles at under a third of the abstract formations' rate, so it holds still enough to read like a photograph.
 2. **Static "nano-halftone" portrait.** It's generated offline with the same palette, plus a dissolving lower edge, as if the particles are drifting off. It serves as the no-WebGL fallback and the social / Open Graph card.
 
 ## 8. Motion spec
 
 | Element | Motion |
 |---|---|
-| Smooth scroll | Lenis, 1.1 s exponential-out; disabled under reduced motion |
-| Headline reveal | Masked lines rise, 0.9 s power4.out, 0.08 stagger |
-| Thesis statement | Words brighten 12 % → 100 %, scrubbed by scroll |
+| Smooth scroll | Lenis (loaded after first paint, fine pointers only); off under reduced motion |
+| Headline reveal | CSS keyframes: masked lines rise (transform only, so LCP never waits on JS), staggered |
+| Thesis statement | Words brighten from a 40 % floor to 100 %, scrubbed by scroll |
 | Glass cards | Opacity + translate only; filters are never animated on glass, which would break the backdrop |
-| Project deck | Sticky stack; covered cards scale to 0.94 and fade |
-| Nav droplet | Leading edge 0.35 s, trailing edge 0.6 s elastic (liquid stretch) |
+| Project deck | Sticky stack; covered cards recede in two stages and fade |
+| Nav selection | Liquid drop: head spring k 430 / ζ 0.66, tail k 100 / ζ 0.94; ≈ 0.45 s between neighbours, ≈ 0.6 s across the bar |
 | Stats | Count-ups (latency counts *down* 1200 → 300 ms) |
 | CTAs | Magnetic pull, max 6 px |
 
 ## 9. Performance budget
 
-- First readable paint: < 1 s on broadband. LCP < 2 s.
-- JS ≈ 260 KB gzip total. Three.js is lazy-loaded after first paint.
-- Frame rate: 60 fps on an M1-class laptop, ≥ 45 fps on recent phones (lower tier).
-- Self-hosted fonts (latin subset); WebP images.
+- First readable paint < 1 s on broadband, LCP < 2 s, no layout shift.
+- JS ≈ 30 KB gzip in total: the main bundle (≈ 10.5 KB) runs first; the WebGL engine (≈ 12.6 KB) and Lenis (≈ 5.4 KB) load after first paint.
+- Frame rate: 60 fps in motion on integrated laptop GPUs at full Retina resolution; 30 fps pacing on phones and at rest.
+- Self-hosted fonts (latin subset, critical faces preloaded); WebP images; sections below the fold use `content-visibility: auto`.
 
 ## 10. Build plan
 
 1. Scaffold `portfolio/` (Vite 8, vanilla ES modules: no framework, so less JS).
 2. Process the photo: sampling texture, nano-halftone portrait, OG card, favicon.
-3. Particle engine: formations, shaders, touch texture, scroll mapping, quality tiers, post-processing.
-4. Liquid Glass: CSS material, Chromium refraction generator, iOS 27 intensity control, gel droplet nav and mobile tab bar.
+3. Particle engine: raw WebGL2, worker-built formations, shaders, touch texture, scroll mapping, GPU budgets, post-processing.
+4. Liquid Glass: CSS material, worker-generated shading and refraction maps, glass-group nav with the liquid selection, mobile tab bar.
 5. Sections and content, with animated SVG architecture diagrams.
-6. Motion layer: Lenis, GSAP ScrollTrigger and SplitText, magnetic CTAs, press illumination.
+6. Motion layer: CSS intro, IntersectionObserver reveals, scroll-scrubbed effects, magnetic CTAs, press illumination.
 7. Responsive layout, accessibility, reduced motion, fallbacks.
-8. Verify: production build, desktop and mobile in a browser, console clean, frame-rate check.
+8. Verify: production build, desktop and mobile in a browser, console clean, frame-rate and Lighthouse checks.

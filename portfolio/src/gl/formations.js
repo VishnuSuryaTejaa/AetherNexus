@@ -46,16 +46,17 @@ const smoothstep = (e0, e1, x) => {
 
 const toLinear = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
 
-// Golden-hour gradient map (sRGB 0–255), identical to the offline halftone
+// Moonlight gradient map (sRGB 0–255): navy shadows → electric blue → frost
+// highlights, identical to the offline halftone; violet rim light
 const STOPS = [
-  [0.0, [27, 11, 7]],
-  [0.18, [74, 25, 12]],
-  [0.38, [185, 71, 26]],
-  [0.58, [242, 154, 79]],
-  [0.78, [255, 220, 176]],
-  [1.0, [255, 248, 239]],
+  [0.0, [6, 10, 24]],
+  [0.18, [14, 28, 72]],
+  [0.38, [36, 78, 200]],
+  [0.58, [86, 146, 255]],
+  [0.78, [178, 214, 255]],
+  [1.0, [246, 250, 255]],
 ];
-const ICE = [143, 208, 255];
+const RIM = [176, 150, 255];
 
 function gradientMap(l) {
   l = Math.min(1, Math.max(0, l));
@@ -131,15 +132,9 @@ function rotate(p, rx, ry, rz) {
 }
 
 /* ------------------------------------------------------------ 0. portrait */
-export function samplePortrait(img, grid, rand) {
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = grid;
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(img, 0, 0, grid, grid);
-  const px = ctx.getImageData(0, 0, grid, grid).data;
-
+// `px` is the cut-out photo resampled to grid×grid RGBA (Uint8ClampedArray).
+// Pure maths — no DOM — so it runs inside a Web Worker.
+export function samplePortrait(px, grid, rand) {
   const n = grid * grid;
   const alpha = new Float32Array(n);
   for (let i = 0; i < n; i++) alpha[i] = px[i * 4 + 3] / 255;
@@ -164,12 +159,12 @@ export function samplePortrait(img, grid, rand) {
       const rim = Math.max(0, 1 - Math.abs(alphaWide[i] - 0.5) * 2.4);
 
       const gm = gradientMap(l2);
-      let cr = gm[0] * 0.78 + r * 255 * 0.22;
-      let cg = gm[1] * 0.78 + g * 255 * 0.22;
-      let cb = gm[2] * 0.78 + b * 255 * 0.22;
-      cr = cr * (1 - rim * 0.75) + ICE[0] * rim * 0.75;
-      cg = cg * (1 - rim * 0.75) + ICE[1] * rim * 0.75;
-      cb = cb * (1 - rim * 0.75) + ICE[2] * rim * 0.75;
+      let cr = gm[0] * 0.9 + r * 255 * 0.1;
+      let cg = gm[1] * 0.9 + g * 255 * 0.1;
+      let cb = gm[2] * 0.9 + b * 255 * 0.1;
+      cr = cr * (1 - rim * 0.75) + RIM[0] * rim * 0.75;
+      cg = cg * (1 - rim * 0.75) + RIM[1] * rim * 0.75;
+      cb = cb * (1 - rim * 0.75) + RIM[2] * rim * 0.75;
 
       // 2.5D relief: head ellipsoid + shoulders + a touch of luminance
       const hx = (u - 0.52) / 0.3;
@@ -355,10 +350,10 @@ function signal(N, rand, gauss) {
 }
 
 /* ------------------------------------------------------------ assemble */
-export function buildFormations(img, grid, seed = 0x5eed) {
+export function buildFormations(px, grid, seed = 0x5eed) {
   const rand = mulberry32(seed);
   const gauss = gaussian(rand);
-  const portrait = samplePortrait(img, grid, rand);
+  const portrait = samplePortrait(px, grid, rand);
   const N = portrait.count;
 
   const g = gap(N, rand, gauss);

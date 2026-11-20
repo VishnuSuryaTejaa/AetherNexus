@@ -1,5 +1,6 @@
 // Small touches: copy-to-clipboard toast, live IST clock, degree progress,
-// velocity-reactive marquee and touch-aware hint copy.
+// velocity-reactive marquee, touch-aware hint copy — and pausing every CSS /
+// SVG animation that is off-screen so it costs nothing.
 
 export function initMisc() {
   // ---- toast
@@ -69,19 +70,40 @@ export function initMisc() {
     edu.parentElement.setAttribute('title', `${Math.round(p * 100)}% of the degree complete`);
   }
 
-  // ---- hint copy for touch screens
-  if (window.matchMedia('(pointer: coarse)').matches) {
-    const hint = document.querySelector('.hint-text');
-    if (hint) hint.textContent = 'Touch the portrait to add noise';
-  }
+
+  // ---- pause CSS + SMIL animations while their region is off-screen
+  const pauseIO = new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) {
+        e.target.classList.toggle('is-offscreen', !e.isIntersecting);
+        const svg = e.target.querySelector('svg.diagram');
+        if (svg?.pauseAnimations) {
+          if (e.isIntersecting) svg.unpauseAnimations();
+          else svg.pauseAnimations();
+        }
+      }
+    },
+    { rootMargin: '15% 0px' },
+  );
+  document.querySelectorAll('.project__visual, .marquee, .hero, .contact').forEach((el) => {
+    // below-the-fold regions start paused; the observer wakes them in view
+    if (!el.matches('.hero, .contact')) {
+      el.classList.add('is-offscreen');
+      el.querySelector('svg.diagram')?.pauseAnimations?.();
+    }
+    pauseIO.observe(el);
+  });
 
   // ---- marquee reacts to scroll velocity
   const track = document.querySelector('.marquee__track');
-  const anim = track?.getAnimations?.()[0];
+  let anim = null;
   return {
     tick(velocity) {
+      if (Math.abs(velocity || 0) < 0.5 && !anim) return;
+      anim ||= track?.getAnimations?.()[0] || null;
       if (!anim) return;
       const target = 1 + Math.min(6, Math.abs(velocity || 0) * 0.12);
+      if (Math.abs(anim.playbackRate - target) < 0.01) return;
       anim.playbackRate += (target - anim.playbackRate) * 0.08;
     },
   };

@@ -1,22 +1,14 @@
-// Shared display state: Liquid Glass intensity (iOS 27 slider) + motion preference.
-const KEY = 'vst:display';
+// Shared display state. Motion follows the visitor's OS setting
+// (prefers-reduced-motion) and updates live if they change it.
 const listeners = new Set();
 const reduceQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
 
-let saved = {};
-try {
-  saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {};
-} catch {
-  saved = {};
-}
-
 export const store = {
-  gi: typeof saved.gi === 'number' ? Math.min(1, Math.max(0, saved.gi)) : 0.5,
-  motion: typeof saved.motion === 'boolean' ? saved.motion : !reduceQuery.matches,
+  gi: 0.5, // Liquid Glass intensity — Apple's midpoint default
+  motion: !reduceQuery.matches,
 
   set(patch) {
     Object.assign(this, patch);
-    persist();
     apply();
     listeners.forEach((fn) => fn(this, patch));
   },
@@ -27,18 +19,11 @@ export const store = {
   },
 };
 
-function persist() {
-  try {
-    localStorage.setItem(KEY, JSON.stringify({ gi: store.gi, motion: store.motion }));
-  } catch {
-    /* storage unavailable (private mode) — state still works for this visit */
-  }
-}
-
 function apply() {
   const root = document.documentElement;
   root.style.setProperty('--gi', String(store.gi));
   root.dataset.motion = store.motion ? 'full' : 'reduced';
 }
 
+reduceQuery.addEventListener?.('change', (e) => store.set({ motion: !e.matches }));
 apply();

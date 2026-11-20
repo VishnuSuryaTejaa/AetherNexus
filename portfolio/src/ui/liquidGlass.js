@@ -1,164 +1,22 @@
 // Liquid Glass for the web — two layers generated per element from one
-// physical model: a squircle bezel (Apple's preferred surface profile).
+// physical model, a squircle bezel (see glassMaps.js):
 //
-// 1. Volumetric bezel shading — every browser.
-//    The bezel's surface normals are lit from above (iOS 27's vertical light
-//    angle): a bright specular rim where the edge faces the light, a softer
-//    internal reflection on the opposite edge and a faint inner shadow that
-//    gives the glass thickness. Rendered once per size into a PNG that sits in
-//    the element's background stack (--lg-spec).
+// 1. Volumetric bezel shading — every browser. A PNG in the element's
+//    background stack (--lg-spec): specular rim lit from above (iOS 27's
+//    vertical light), internal reflection below, inner shadow for thickness.
+// 2. Refraction — Chromium only (the one engine that accepts an SVG filter as
+//    a backdrop-filter): an feDisplacementMap bends the backdrop through
+//    Snell's law; strong GPUs also split R/G/B for a faint dispersion fringe.
 //
-// 2. Refraction — Chromium (the only engine that accepts an SVG filter as a
-//    backdrop-filter). The same normals bend the backdrop through Snell's law
-//    (n = 1.5) via an feDisplacementMap; smaller controls also split R/G/B for
-//    the faint dispersion fringe real glass shows at its rim.
+// Maps are generated in a worker (OffscreenCanvas) and arrive as blob URLs, so
+// the main thread only measures (in a ResizeObserver) and sets a variable.
+import { displacementPixels, shadingPixels } from './glassMaps.js';
 
-const IOR = 1.5;
-const SAMPLES = 128;
-const MAP_SCALE = 0.5; // displacement is smooth — half resolution is plenty
-const SPEC_MAX = 560; // longest side of a shading map, in px (the crisp rim is CSS)
-const DISPERSION_MAX_AREA = 180000; // px² — larger panels skip the RGB split (GPU budget)
-
-// Direction *towards* the light, in screen space (y points down): above, a touch left
-const LX = -0.34;
-const LY = -0.94;
+const REFRACT_MAX_AREA = 200000; // px² — big content panels keep CSS frost only (GPU budget)
 
 export function isChromium() {
   const brands = navigator.userAgentData?.brands;
   return Array.isArray(brands) && brands.some((b) => /Chromium/i.test(b.brand));
-}
-
-// Surface height across the bezel (x: 0 = rim → 1 = flat top)
-const squircle = (x) => Math.pow(1 - Math.pow(1 - x, 4), 0.25);
-
-function refractionProfile(bezel, thickness) {
-  const out = new Float32Array(SAMPLES);
-  const e = 1e-3;
-  for (let i = 0; i < SAMPLES; i++) {
-    const x = i / (SAMPLES - 1);
-    const x0 = Math.max(0, x - e);
-    const x1 = Math.min(1, x + e);
-    const slope = ((squircle(x1) - squircle(x0)) / (x1 - x0)) * (thickness / bezel);
-    const thetaI = Math.atan(slope);
-    const thetaT = Math.asin(Math.sin(thetaI) / IOR);
-    const travel = thickness * (squircle(x) + 0.15);
-    out[i] = Math.tan(thetaI - thetaT) * travel; // lateral shift (px), pointing inwards
-  }
-  return out;
-}
-
-function sampleProfile(profile, t) {
-  const f = Math.min(1, Math.max(0, t)) * (SAMPLES - 1);
-  const i = Math.floor(f);
-  const j = Math.min(SAMPLES - 1, i + 1);
-  return profile[i] + (profile[j] - profile[i]) * (f - i);
-}
-
-// Walk the bezel band of a rounded rectangle. Calls fn(index, t, nx, ny) for
-// every pixel inside the bezel: t = 0 at the rim → 1 where the glass is flat,
-// (nx, ny) = outward surface direction in the screen plane.
-function walkBezel(W, H, scale, w, h, radius, bezel, fn) {
-  const hw = w / 2;
-  const hh = h / 2;
-  const r = Math.min(radius, hw, hh);
-  // Rows away from the top/bottom bands only touch the bezel near the left and
-  // right edges, so visit just those two strips (~7× fewer pixels on big panels)
-  const band = Math.max(r, bezel) + 1;
-  const strip = Math.min(W, Math.ceil(bezel * scale) + 2);
-  for (let py = 0; py < H; py++) {
-    const y = (py + 0.5) / scale - hh;
-    const qy = Math.abs(y) - (hh - r);
-    const full = Math.abs(y) >= hh - band;
-    for (let px = 0; px < W; px++) {
-      if (!full && px === strip && W - strip > strip) px = W - strip;
-      const x = (px + 0.5) / scale - hw;
-      const qx = Math.abs(x) - (hw - r);
-      let dist;
-      let nx;
-      let ny;
-      if (qx > 0 && qy > 0) {
-        const l = Math.hypot(qx, qy) || 1;
-        dist = l - r;
-        nx = (qx / l) * Math.sign(x);
-        ny = (qy / l) * Math.sign(y);
-      } else if (qx > qy) {
-        dist = qx - r;
-        nx = Math.sign(x);
-        ny = 0;
-      } else {
-        dist = qy - r;
-        nx = 0;
-        ny = Math.sign(y);
-      }
-      const inner = -dist;
-      if (inner >= 0 && inner < bezel) fn(py * W + px, inner / bezel, nx, ny);
-    }
-  }
-}
-
-function canvasFor(W, H) {
-  const canvas = document.createElement('canvas');
-  canvas.width = W;
-  canvas.height = H;
-  // CPU-backed canvas: putImageData + toDataURL on a GPU canvas forces a
-  // readback stall (~25 ms each); in software it is a couple of milliseconds
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  return { canvas, ctx, img: ctx.createImageData(W, H) };
-}
-
-/* ------------------------------------------------------------------ shading */
-function shadingMap(w, h, radius, bezel, power) {
-  const s = Math.min(1, SPEC_MAX / Math.max(w, h));
-  const W = Math.max(2, Math.round(w * s));
-  const H = Math.max(2, Math.round(h * s));
-  const { canvas, ctx, img } = canvasFor(W, H);
-  const d = img.data;
-  walkBezel(W, H, s, w, h, radius, bezel, (i, t, nx, ny) => {
-    const facing = nx * LX + ny * LY; // > 0: the edge faces the light
-    const key = facing > 0 ? Math.pow(facing, 1.6) : 0;
-    const back = facing < 0 ? Math.pow(-facing, 2.2) : 0;
-    const rim = Math.exp(-t * 8.5); // hugs the outer edge
-    const band = Math.exp(-((t - 0.36) ** 2) / 0.03); // a ring just inside the rim
-    const hi = power * (rim * (0.66 * key + 0.32 * back) + band * 0.12 * key);
-    const sh = power * band * 0.22 * back;
-    const k = i * 4;
-    if (hi >= sh) {
-      d[k] = 255;
-      d[k + 1] = 248;
-      d[k + 2] = 238;
-      d[k + 3] = Math.min(255, hi * 255);
-    } else {
-      d[k] = 4;
-      d[k + 1] = 5;
-      d[k + 2] = 8;
-      d[k + 3] = Math.min(255, sh * 255);
-    }
-  });
-  ctx.putImageData(img, 0, 0);
-  return canvas.toDataURL('image/png');
-}
-
-/* ------------------------------------------------------------------ refraction */
-function displacementMap(w, h, radius, bezel, strength) {
-  const W = Math.max(2, Math.round(w * MAP_SCALE));
-  const H = Math.max(2, Math.round(h * MAP_SCALE));
-  const profile = refractionProfile(bezel, bezel);
-  let maxD = 0;
-  for (let i = 0; i < SAMPLES; i++) maxD = Math.max(maxD, profile[i]);
-  maxD = Math.max(0.5, maxD * strength);
-
-  const { canvas, ctx, img } = canvasFor(W, H);
-  const d = img.data;
-  d.fill(128); // neutral: no displacement
-  for (let i = 3; i < d.length; i += 4) d[i] = 255;
-  walkBezel(W, H, MAP_SCALE, w, h, radius, bezel, (i, t, nx, ny) => {
-    const mag = sampleProfile(profile, t) * strength;
-    const k = i * 4;
-    d[k] = 128 + ((-nx * mag) / maxD) * 127;
-    d[k + 1] = 128 + ((-ny * mag) / maxD) * 127;
-  });
-  ctx.putImageData(img, 0, 0);
-  return { url: canvas.toDataURL('image/png'), scale: maxD * 2 };
 }
 
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -200,24 +58,33 @@ function writeFilter(filter, { w, h, url, scale, std, dispersion }) {
   return blur;
 }
 
-/* ------------------------------------------------------------------ runtime */
+// Main-thread fallback encoder (browsers without OffscreenCanvas in workers)
+function encodeHere({ W, H, data }) {
+  const c = document.createElement('canvas');
+  c.width = W;
+  c.height = H;
+  c.getContext('2d', { willReadFrequently: true }).putImageData(new ImageData(data, W, H), 0, 0);
+  return c.toDataURL('image/png');
+}
+
 export function initLiquidGlass(store) {
   const root = document.documentElement;
   const dyn = document.createElement('style');
   dyn.id = 'glass-dynamic';
   document.head.appendChild(dyn);
 
-  const refract = isChromium() && CSS.supports('backdrop-filter', 'url(#x)');
-  root.classList.add(refract ? 'lg-refract' : 'lg-fallback');
-
-  const defs = document.getElementById('lg-defs');
-  const entries = new Map();
-  let uid = 0;
+  let refract = false;
+  let dispersion = false;
   let current = null;
+  let uid = 0;
+  const defs = document.getElementById('lg-defs');
+  const entries = new Map(); // el → { id, w, h, r, version, filter, blur, urls }
+  const byId = new Map(); // id → el
+  const metrics = new Map(); // el → { w, h, radius } from the ResizeObserver
 
   const values = (gi) => ({
     blurClear: +(3 + gi * 14).toFixed(1),
-    blurPanel: +(14 + gi * 26).toFixed(1),
+    blurPanel: +(12 + gi * 18).toFixed(1),
     sat: +(1.6 + gi * 0.35).toFixed(2),
   });
 
@@ -237,32 +104,18 @@ export function initLiquidGlass(store) {
     return std;
   }
 
-  // Sizes and radii come from the ResizeObserver callback (layout is already
-  // clean there), so building never forces a synchronous layout
-  const metrics = new Map();
+  function setUrl(entry, key, value) {
+    const old = entry.urls?.[key];
+    if (old && old.startsWith('blob:')) URL.revokeObjectURL(old);
+    (entry.urls ||= {})[key] = value;
+    return value;
+  }
 
-  function build(el) {
-    const m = metrics.get(el);
-    if (!m) return;
-    const { w, h } = m;
-    if (w < 12 || h < 12) return;
-    const radius = Math.min(m.radius, w / 2, h / 2);
-    let entry = entries.get(el);
-    if (entry && entry.w === w && entry.h === h && entry.r === radius) return;
-    if (!entry) {
-      entry = { id: `lgf${uid++}` };
-      entries.set(el, entry);
-    }
-    Object.assign(entry, { w, h, r: radius });
-
-    const panel = el.classList.contains('glass--panel');
-    const bezel = Math.max(8, Math.min(radius > 0 ? radius * 0.92 : 18, 36, Math.min(w, h) / 2 - 1));
-
-    // 1 · volumetric shading (all browsers)
-    el.style.setProperty('--lg-spec', `url("${shadingMap(w, h, radius, bezel, panel ? 0.78 : 1)}")`);
-
-    // 2 · refraction (Chromium)
-    if (refract && el.hasAttribute('data-lg')) {
+  // Apply a finished map pair to its element
+  function apply(el, entry, res) {
+    const spec = res.spec instanceof Blob ? URL.createObjectURL(res.spec) : res.spec;
+    el.style.setProperty('--lg-spec', `url("${setUrl(entry, 'spec', spec)}")`);
+    if (res.disp) {
       if (!entry.filter) {
         entry.filter = svg('filter', {
           id: entry.id,
@@ -272,15 +125,86 @@ export function initLiquidGlass(store) {
         });
         defs.appendChild(entry.filter);
       }
-      const strength = Number(el.dataset.lgStrength || 2.1);
-      const { url, scale } = displacementMap(w, h, radius, bezel, strength);
+      const url = setUrl(entry, 'disp', res.disp instanceof Blob ? URL.createObjectURL(res.disp) : res.disp);
+      const panel = el.classList.contains('glass--panel');
       const std = panel ? current.blurPanel : current.blurClear * 0.32;
-      entry.blur = writeFilter(entry.filter, { w, h, url, scale, std, dispersion: w * h <= DISPERSION_MAX_AREA });
+      entry.blur = writeFilter(entry.filter, { w: entry.w, h: entry.h, url, scale: res.scale, std, dispersion });
       refractStyle(el, entry);
+    } else if (entry.filter) {
+      // grew past the refraction budget: fall back to the CSS frost
+      entry.filter.remove();
+      entry.filter = null;
+      entry.blur = null;
+      setUrl(entry, 'disp', null);
+      el.style.backdropFilter = '';
     }
   }
 
-  // Build queue with a per-frame time budget, so generation never janks a frame
+  // ---- worker results land a few per frame, so style recalcs stay small
+  const ready = [];
+  let readyRaf = 0;
+  const drain = () => {
+    readyRaf = 0;
+    for (const res of ready.splice(0, 4)) {
+      const el = byId.get(res.id);
+      const entry = el && entries.get(el);
+      if (!entry || res.version !== entry.version || res.error) continue; // stale or failed
+      apply(el, entry, res);
+    }
+    if (ready.length) readyRaf = requestAnimationFrame(drain);
+  };
+
+  // ---- worker
+  let worker = null;
+  const useWorker = typeof OffscreenCanvas !== 'undefined' && typeof Worker !== 'undefined';
+  function getWorker() {
+    if (worker || !useWorker) return worker;
+    try {
+      worker = new Worker(new URL('./glass.worker.js', import.meta.url), { type: 'module' });
+      worker.onmessage = (e) => {
+        ready.push(e.data);
+        if (!readyRaf) readyRaf = requestAnimationFrame(drain);
+      };
+    } catch {
+      worker = null;
+    }
+    return worker;
+  }
+
+  function build(el) {
+    const m = metrics.get(el);
+    if (!m || m.w < 12 || m.h < 12) return;
+    const { w, h } = m;
+    const radius = Math.min(m.radius, w / 2, h / 2);
+    let entry = entries.get(el);
+    if (entry && entry.w === w && entry.h === h && entry.r === radius) return;
+    if (!entry) {
+      entry = { id: `lgf${uid++}`, version: 0 };
+      entries.set(el, entry);
+      byId.set(entry.id, el);
+    }
+    Object.assign(entry, { w, h, r: radius });
+    entry.version++;
+    const panel = el.classList.contains('glass--panel');
+    const bezel = Math.max(8, Math.min(radius > 0 ? radius * 0.92 : 18, 36, Math.min(w, h) / 2 - 1));
+    const strength = refract && el.hasAttribute('data-lg') && w * h <= REFRACT_MAX_AREA ? Number(el.dataset.lgStrength || 2.1) : 0;
+    const job = { id: entry.id, version: entry.version, w, h, radius, bezel, power: panel ? 0.78 : 1, strength };
+    const wk = getWorker();
+    if (wk) {
+      wk.postMessage(job);
+      return;
+    }
+    const res = { spec: encodeHere(shadingPixels(w, h, radius, bezel, job.power)) };
+    if (strength) {
+      const d = displacementPixels(w, h, radius, bezel, strength);
+      res.disp = encodeHere(d);
+      res.scale = d.scale;
+    }
+    apply(el, entry, res);
+  }
+
+  // Sizes come from the ResizeObserver (layout is already clean there), so
+  // nothing here forces a synchronous layout
   const pending = new Set();
   let raf = 0;
   const flush = () => {
@@ -289,7 +213,7 @@ export function initLiquidGlass(store) {
     for (const el of pending) {
       pending.delete(el);
       build(el);
-      if (performance.now() - t0 > 8) break;
+      if (performance.now() - t0 > 6) break;
     }
     if (pending.size) raf = requestAnimationFrame(flush);
   };
@@ -310,12 +234,24 @@ export function initLiquidGlass(store) {
     }
   });
 
-  // The observer's first notification measures the element and queues it
+  // Glass is measured only as it approaches the viewport: a ResizeObserver on
+  // an element inside a content-visibility-skipped section would force that
+  // whole section to lay out just to report a size
   const observed = new WeakSet();
+  const near = new IntersectionObserver(
+    (list) => {
+      for (const e of list) {
+        if (!e.isIntersecting) continue;
+        near.unobserve(e.target);
+        ro.observe(e.target); // its first notification measures and queues it
+      }
+    },
+    { rootMargin: '60% 0px' },
+  );
   function observe(el) {
     if (observed.has(el)) return;
     observed.add(el);
-    ro.observe(el);
+    near.observe(el);
   }
 
   function setIntensity(gi) {
@@ -327,10 +263,17 @@ export function initLiquidGlass(store) {
   }
 
   setIntensity(store.gi);
-  document.querySelectorAll('.glass').forEach(observe);
-  store.subscribe((s, patch) => {
-    if ('gi' in patch) setIntensity(s.gi);
+  store.subscribe((st, patch) => {
+    if ('gi' in patch) setIntensity(st.gi);
   });
 
-  return { refract, observe };
+  // Called once the page is loaded and the GPU probe has answered (main.js)
+  function start(gpu) {
+    refract = isChromium() && !!gpu && !gpu.coarse && CSS.supports('backdrop-filter', 'url(#x)');
+    dispersion = refract && !!gpu?.strong;
+    root.classList.add(refract ? 'lg-refract' : 'lg-fallback');
+    document.querySelectorAll('.glass').forEach(observe);
+  }
+
+  return { start, observe };
 }

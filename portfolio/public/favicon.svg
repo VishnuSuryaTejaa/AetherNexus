@@ -1,16 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <defs>
     <linearGradient id="g" x1="0" y1="18" x2="0" y2="48" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#FFE1B8"/>
-      <stop offset=".5" stop-color="#FFB35C"/>
-      <stop offset="1" stop-color="#FF6B2C"/>
+      <stop offset="0" stop-color="#EAF3FF"/>
+      <stop offset=".5" stop-color="#6AA8FF"/>
+      <stop offset="1" stop-color="#3D6BFF"/>
     </linearGradient>
   </defs>
-  <rect width="64" height="64" rx="16" fill="#07080B"/>
+  <rect width="64" height="64" rx="16" fill="#05070D"/>
   <rect x=".75" y=".75" width="62.5" height="62.5" rx="15.25" fill="none" stroke="#fff" stroke-opacity=".14" stroke-width="1.5"/>
   <g fill="url(#g)">
     <circle cx="17" cy="19" r="3"/><circle cx="19.7" cy="24.2" r="2.8"/><circle cx="22.4" cy="29.4" r="2.7"/><circle cx="25.1" cy="34.6" r="2.6"/><circle cx="27.8" cy="39.8" r="2.5"/><circle cx="30.5" cy="45" r="2.4"/>
     <circle cx="44.3" cy="24.2" r="2.8"/><circle cx="41.6" cy="29.4" r="2.7"/><circle cx="38.9" cy="34.6" r="2.6"/><circle cx="36.2" cy="39.8" r="2.5"/><circle cx="33.5" cy="45" r="2.4"/>
   </g>
-  <circle cx="47" cy="19" r="3" fill="#8FD0FF"/>
+  <circle cx="47" cy="19" r="3" fill="#A18BFF"/>
 </svg>

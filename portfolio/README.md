@@ -27,12 +27,13 @@ npm run preview   # serve dist/ on http://localhost:5200
 | What | Where |
 |---|---|
 | All page content (from the résumé) | `index.html` |
-| Particle engine (formations, morph, noise brush, post-processing) | `src/gl/` |
-| Liquid Glass (shading maps, Chromium refraction, intensity slider) | `src/ui/liquidGlass.js`, `src/styles/glass.css` |
-| Nav droplet, display control, reveals, magnetic CTAs | `src/ui/` |
+| Particle engine: raw WebGL2, formations worker, GPU budgets, post-processing | `src/gl/` |
+| Liquid Glass: shading and refraction maps (built in a worker) | `src/ui/liquidGlass.js`, `src/ui/glassMaps.js`, `src/styles/glass.css` |
+| Liquid nav selection | `src/ui/liquid.js`, `src/ui/nav.js` |
+| Reveals, scroll effects, magnetic CTAs, misc UI | `src/ui/` |
 | Design tokens, layout, sections | `src/styles/` |
-| Portrait assets (particle sampling texture, halftone, avatar) | `src/assets/` |
-| Résumé PDF, social card, favicon | `public/` |
+| Portrait sampling texture, avatar | `src/assets/` |
+| Résumé PDF, halftone fallback portrait, social card, favicon | `public/` |
 
 ## Before deploying
 

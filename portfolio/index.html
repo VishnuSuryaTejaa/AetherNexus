@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>V. Vishnu Surya Teja — AI/ML Engineer</title>
     <meta name="description" content="AI/ML Engineer building LLM systems, agentic pipelines and full-stack AI products — from the dataset underneath to the interface on top. Hyderabad, India." />
-    <meta name="theme-color" content="#07080B" />
+    <meta name="theme-color" content="#05070D" />
     <meta name="color-scheme" content="dark" />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="V. Vishnu Surya Teja — AI/ML Engineer" />
@@ -15,13 +15,11 @@
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <script>
-      document.documentElement.classList.add('js');
-      try {
-        var s = JSON.parse(localStorage.getItem('vst:display') || '{}');
-        if (typeof s.gi === 'number') document.documentElement.style.setProperty('--gi', s.gi);
-        var reduce = typeof s.motion === 'boolean' ? !s.motion : matchMedia('(prefers-reduced-motion: reduce)').matches;
-        if (reduce) document.documentElement.dataset.motion = 'reduced';
-      } catch (e) {}
+      (function () {
+        var d = document.documentElement;
+        d.classList.add('js');
+        if (matchMedia('(prefers-reduced-motion: reduce)').matches) d.dataset.motion = 'reduced';
+      })();
     </script>
   </head>
   <body>
@@ -34,19 +32,18 @@
 
     <!-- Desktop / tablet navigation -->
     <header class="topbar">
-      <nav class="nav glass" data-lg aria-label="Primary">
-        <a class="nav__brand" href="#top" aria-label="Back to top">
+      <nav class="nav" aria-label="Primary">
+        <a class="nav__brand glass" data-lg href="#top" aria-label="VST — back to top">
           <span class="nav__mono">VST</span>
         </a>
-        <div class="nav__links" data-droplet-group>
-          <span class="droplet" aria-hidden="true"></span>
+        <div class="nav__links glass" data-lg data-liquid>
           <a href="#about" data-section="about">About</a>
           <a href="#work" data-section="work">Work</a>
           <a href="#experience" data-section="experience">Experience</a>
           <a href="#skills" data-section="skills">Skills</a>
           <a href="#contact" data-section="contact">Contact</a>
         </div>
-        <a class="nav__cta" href="./Vishnu-Surya-Teja-Resume.pdf" download data-magnetic>
+        <a class="nav__cta glass btn--primary" data-lg href="./Vishnu-Surya-Teja-Resume.pdf" download data-magnetic>
           <span>Résumé</span>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14" /></svg>
         </a>
@@ -58,19 +55,19 @@
       <section class="hero" id="top" data-formation="0" aria-labelledby="hero-title">
         <div class="container hero__inner">
           <div class="hero__copy">
-            <p class="eyebrow mono" data-intro>
+            <p class="eyebrow mono" data-intro style="--d: 0">
               <span class="live-dot" aria-hidden="true"></span>
               AI/ML Engineer — Hyderabad, India
             </p>
             <h1 class="hero__name" id="hero-title" data-intro-lines>
-              <span class="hero__line">Vishnu</span>
-              <span class="hero__line"><em class="serif">Surya</em> Teja</span>
+              <span class="hero__line"><span class="hero__line-inner">Vishnu</span></span>
+              <span class="hero__line"><span class="hero__line-inner"><em class="serif">Surya</em> Teja</span></span>
             </h1>
-            <p class="hero__lede" data-intro>
+            <p class="hero__lede" data-intro style="--d: 2">
               I build <strong>LLM systems</strong> and <strong>agentic pipelines</strong> that hold up in production — from the
               dataset underneath to the interface on top.
             </p>
-            <div class="hero__actions" data-intro>
+            <div class="hero__actions" data-intro style="--d: 3">
               <a class="btn btn--primary glass" data-lg data-magnetic href="#work">
                 <span>View selected work</span>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
@@ -80,15 +77,15 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14" /></svg>
               </a>
             </div>
-            <p class="status glass" data-intro>
+            <p class="status glass" data-intro style="--d: 4">
               <span class="status__pulse" aria-hidden="true"></span>
               Open to AI/ML engineering roles <span class="status__sep" aria-hidden="true">·</span> B.Tech ’27
             </p>
           </div>
 
           <div class="hero__stage" data-anchor="portrait">
-            <img class="hero__fallback" width="880" height="880" decoding="async"
-              alt="Portrait of Vishnu Surya Teja rendered as a field of glowing nano-particles" />
+            <canvas class="hero__fallback" width="600" height="600" data-src="./portrait-halftone.webp" role="img"
+              aria-label="Portrait of Vishnu Surya Teja rendered as a field of glowing nano-particles"></canvas>
             <div class="hud" aria-hidden="true">
               <span class="hud__corner hud__corner--tl"></span><span class="hud__corner hud__corner--tr"></span>
               <span class="hud__corner hud__corner--bl"></span><span class="hud__corner hud__corner--br"></span>
@@ -99,7 +96,6 @@
             </div>
           </div>
         </div>
-        <p class="hero__hint mono" aria-hidden="true"><span class="hint-dot"></span><span class="hint-text">Move across the portrait to add noise</span></p>
         <a class="scroll-cue mono" href="#about" aria-label="Scroll to About">
           <span class="scroll-cue__track"><span class="scroll-cue__thumb"></span></span>
           Scroll
@@ -107,7 +103,7 @@
       </section>
 
       <!-- Tech marquee -->
-      <div class="marquee glass" aria-label="Core tools">
+      <div class="marquee glass" role="marquee" aria-label="Core tools">
         <div class="marquee__track">
           <ul class="marquee__list mono">
             <li>PyTorch</li><li>TensorFlow</li><li>LangGraph</li><li>LangChain</li><li>RAG</li><li>ChromaDB</li><li>Hugging Face</li>
@@ -127,7 +123,7 @@
             <p class="section-label mono" data-reveal><span>01</span> About</p>
             <h2 class="visually-hidden" id="about-title">About</h2>
             <p class="statement" data-words>
-              I follow the gap between what foundation models can do in <em class="serif tone-amber">research</em> and what
+              I follow the gap between what foundation models can do in <em class="serif tone-violet">research</em> and what
               holds up in <em class="serif tone-ice">production</em> — because that gap is where the most interesting
               engineering lives.
             </p>
@@ -185,7 +181,7 @@
         <div class="container">
           <header class="section-head">
             <p class="section-label mono" data-reveal><span>02</span> Selected work</p>
-            <h2 class="section-title" id="work-title" data-split>Systems I've designed, <em class="serif">trained</em> and shipped.</h2>
+            <h2 class="section-title" id="work-title" data-reveal>Systems I've designed, <em class="serif">trained</em> and shipped.</h2>
             <p class="section-intro" data-reveal>
               Four projects, each built around a hard constraint — latency, hallucination, relevance, or data that simply
               didn't exist.
@@ -289,7 +285,7 @@
                     <text x="16" y="26" class="d-title">Lexical Sniper</text>
                     <text x="16" y="42" class="d-label">TF-IDF + GRADIENT BOOST</text>
                     <rect class="d-track" x="16" y="54" width="138" height="6" rx="3" />
-                    <rect class="d-fill d-fill--amber" x="16" y="54" width="86" height="6" rx="3" />
+                    <rect class="d-fill d-fill--accent" x="16" y="54" width="86" height="6" rx="3" />
                     <rect class="d-thresh" x="77" y="50" width="1.5" height="14" />
                   </g>
                   <g class="d-box" transform="translate(150 264)">
@@ -353,8 +349,8 @@
                     <circle r="2.6" class="d-pkt"><animateMotion dur="1.8s" begin="1.2s" repeatCount="indefinite"><mpath href="#vk-p1" /></animateMotion></circle>
                   </g>
                   <g class="d-rank" transform="translate(316 120)">
-                    <g class="d-row" style="--w: 0.94"><rect class="d-track" width="140" height="24" rx="8" /><rect class="d-fill d-fill--amber" width="131.6" height="24" rx="8" /><text x="10" y="16" class="d-label d-label--dark">FIT 0.94</text></g>
-                    <g class="d-row" transform="translate(0 36)" style="--w: 0.88"><rect class="d-track" width="140" height="24" rx="8" /><rect class="d-fill d-fill--amber" width="123.2" height="24" rx="8" /><text x="10" y="16" class="d-label d-label--dark">FIT 0.88</text></g>
+                    <g class="d-row" style="--w: 0.94"><rect class="d-track" width="140" height="24" rx="8" /><rect class="d-fill d-fill--accent" width="131.6" height="24" rx="8" /><text x="10" y="16" class="d-label d-label--dark">FIT 0.94</text></g>
+                    <g class="d-row" transform="translate(0 36)" style="--w: 0.88"><rect class="d-track" width="140" height="24" rx="8" /><rect class="d-fill d-fill--accent" width="123.2" height="24" rx="8" /><text x="10" y="16" class="d-label d-label--dark">FIT 0.88</text></g>
                     <g class="d-row" transform="translate(0 72)" style="--w: 0.79"><rect class="d-track" width="140" height="24" rx="8" /><rect class="d-fill d-fill--ice" width="110.6" height="24" rx="8" /><text x="10" y="16" class="d-label d-label--dark">FIT 0.79</text></g>
                     <g class="d-row" transform="translate(0 108)" style="--w: 0.71"><rect class="d-track" width="140" height="24" rx="8" /><rect class="d-fill d-fill--ice" width="99.4" height="24" rx="8" /><text x="10" y="16" class="d-label d-label--dark">FIT 0.71</text></g>
                   </g>
@@ -444,7 +440,7 @@
         <div class="container">
           <header class="section-head">
             <p class="section-label mono" data-reveal><span>03</span> Experience</p>
-            <h2 class="section-title" id="exp-title" data-split>Where I've <em class="serif">shipped</em>.</h2>
+            <h2 class="section-title" id="exp-title" data-reveal>Where I've <em class="serif">shipped</em>.</h2>
           </header>
           <div class="exp__grid">
             <ol class="timeline">
@@ -492,7 +488,7 @@
           <div class="skills__aside">
             <header class="section-head section-head--tight">
               <p class="section-label mono" data-reveal><span>04</span> Capabilities</p>
-              <h2 class="section-title" id="skills-title" data-split>A toolkit chosen by <em class="serif">what the problem needs</em>.</h2>
+              <h2 class="section-title" id="skills-title" data-reveal>A toolkit chosen by <em class="serif">what the problem needs</em>.</h2>
             </header>
             <div class="skills__orb" data-anchor="sphere" aria-hidden="true"></div>
           </div>
@@ -551,7 +547,7 @@
       <section class="section contact" id="contact" data-formation="4" aria-labelledby="contact-title">
         <div class="container contact__inner">
           <p class="section-label mono" data-reveal><span>05</span> Contact</p>
-          <h2 class="contact__title" id="contact-title" data-anchor="ring" data-split>
+          <h2 class="contact__title" id="contact-title" data-anchor="ring" data-reveal>
             Let's build something that <em class="serif">holds up</em> in production.
           </h2>
           <p class="contact__lede" data-reveal>
@@ -592,15 +588,14 @@
     <footer class="footer">
       <div class="container footer__inner">
         <p class="mono">© 2026 V. Vishnu Surya Teja</p>
-        <p class="footer__made mono">Generated from noise · Three.js · GSAP · Liquid Glass</p>
+        <p class="footer__made mono">Generated from noise · WebGL2 · Liquid Glass</p>
         <a class="footer__top mono" href="#top">Back to top ↑</a>
       </div>
     </footer>
 
     <!-- Mobile tab bar (iOS-style) -->
     <nav class="tabbar" aria-label="Sections">
-      <div class="tabbar__pill glass" data-lg data-droplet-group>
-        <span class="droplet" aria-hidden="true"></span>
+      <div class="tabbar__pill glass" data-lg data-liquid>
         <a href="#top" data-section="top">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11.2 12 4l8.5 7.2" /><path d="M6 9.8v9.7h12V9.8" /></svg><span>Home</span>
         </a>
@@ -618,32 +613,6 @@
         </a>
       </div>
     </nav>
-
-    <!-- iOS 27-style display control -->
-    <div class="gc" id="gc">
-      <div class="gc__panel glass glass--panel" id="gc-panel" role="dialog" aria-labelledby="gc-title" hidden>
-        <p class="gc__title" id="gc-title">Display</p>
-        <div class="gc__group">
-          <div class="gc__row">
-            <label for="gc-intensity">Liquid Glass</label>
-            <output class="mono" id="gc-out" for="gc-intensity">50%</output>
-          </div>
-          <div class="gc__slider">
-            <span class="mono">Clear</span>
-            <input id="gc-intensity" type="range" min="0" max="100" step="1" value="50" />
-            <span class="mono">Tinted</span>
-          </div>
-        </div>
-        <div class="gc__row gc__row--switch">
-          <span id="gc-motion-label">Motion &amp; particles</span>
-          <button class="switch" id="gc-motion" type="button" role="switch" aria-checked="true" aria-labelledby="gc-motion-label"><span></span></button>
-        </div>
-        <p class="gc__note mono">Intensity slider modelled on iOS 27</p>
-      </div>
-      <button class="gc__btn glass" data-lg id="gc-btn" type="button" aria-label="Display settings" aria-expanded="false" aria-controls="gc-panel">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2c3.7 4.3 6.2 7.7 6.2 10.8a6.2 6.2 0 0 1-12.4 0c0-3.1 2.5-6.5 6.2-10.8z" /><path class="gc__shine" d="M9.2 14.6a3 3 0 0 0 2.4 2.6" /></svg>
-      </button>
-    </div>
 
     <p class="diffusion-chip mono" aria-hidden="true"><span class="live-dot"></span><span id="chip-formation">x₀ · portrait</span><span class="diffusion-chip__sigma">σ <b id="chip-sigma">0.00</b></span></p>
     <div class="toast glass glass--panel" role="status" aria-live="polite"></div>

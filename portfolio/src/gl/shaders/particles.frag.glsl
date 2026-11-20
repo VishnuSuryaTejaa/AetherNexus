@@ -1,12 +1,14 @@
-varying vec3 vColor;
-varying float vAlpha;
+#version 300 es
+precision mediump float;
+
+in vec3 vColor;
+in float vAlpha;
+out vec4 fragColor;
 
 void main() {
   vec2 c = gl_PointCoord * 2.0 - 1.0;
   float r2 = dot(c, c);
   if (r2 > 1.0) discard;
-  float core = exp(-r2 * 6.5);
-  float halo = exp(-r2 * 2.0) * 0.16;
-  float a = (core + halo) * vAlpha;
-  gl_FragColor = vec4(vColor * a, a);
+  float a = (exp(-r2 * 6.5) + exp(-r2 * 2.0) * 0.18) * vAlpha;
+  fragColor = vec4(vColor * a, a);
 }

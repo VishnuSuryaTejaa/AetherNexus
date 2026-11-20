@@ -1,18 +1,15 @@
-import { CanvasTexture, LinearFilter } from 'three';
-
 // Screen-space "noise brush": the pointer paints a fading trail that the
 // vertex shader reads to add local σ (noise) and push particles apart.
+// The engine uploads `canvas` as a texture only while the trail is alive.
 export class TouchTexture {
   constructor(width = 192) {
     this.width = width;
     this.canvas = document.createElement('canvas');
     this.ctx = this.canvas.getContext('2d');
-    this.texture = new CanvasTexture(this.canvas);
-    this.texture.minFilter = LinearFilter;
-    this.texture.magFilter = LinearFilter;
-    this.texture.generateMipmaps = false;
     this.points = [];
     this.last = null;
+    this.alive = 0; // seconds of trail left to fade
+    this.dirty = true;
     this.resize(window.innerWidth / window.innerHeight);
   }
 
@@ -23,11 +20,9 @@ export class TouchTexture {
     this.canvas.height = height;
     this.ctx.fillStyle = '#000';
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-    // WebGL2 texture storage is immutable: release it so three.js re-allocates
-    // at the new size instead of writing out of bounds
-    this.texture.dispose();
-    this.texture.needsUpdate = true;
     this.last = null;
+    this.dirty = true;
+    this.resized = true;
   }
 
   // u, v in [0, 1], v measured from the top of the screen
@@ -53,7 +48,9 @@ export class TouchTexture {
     this.last = null;
   }
 
+  // Returns true when the texture changed and needs uploading
   update(dt) {
+    if (!this.points.length && this.alive <= 0) return false;
     const { ctx, canvas } = this;
     ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = `rgba(0,0,0,${Math.min(1, dt * 2.6)})`;
@@ -71,11 +68,16 @@ export class TouchTexture {
         ctx.fillRect(x - r, y - r, r * 2, r * 2);
       }
       this.points.length = 0;
+      this.alive = 1.6;
+    } else {
+      this.alive -= dt;
+      if (this.alive <= 0) {
+        // fully faded: clear residue so the texture can go idle
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
     }
-    this.texture.needsUpdate = true;
-  }
-
-  dispose() {
-    this.texture.dispose();
+    return true;
   }
 }

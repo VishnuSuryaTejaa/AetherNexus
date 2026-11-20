@@ -1,9 +1,10 @@
-import { gsap } from 'gsap';
-
 // Pointer craft, without anything that chases the cursor:
 //  · press illumination — glass lights up from the exact point you touch it
 //    (iOS 26/27 behaviour); position is set once per press, never tracked
-//  · magnetic CTAs — a subtle 6px pull with a spring release
+//  · magnetic CTAs — a subtle 6px pull; CSS `translate` + spring easing does
+//    the motion, so there is no animation loop
+const clamp = (v) => Math.max(-6, Math.min(6, v));
+
 export function initPointerFx(store) {
   document.addEventListener(
     'pointerdown',
@@ -20,18 +21,19 @@ export function initPointerFx(store) {
   if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
 
   document.querySelectorAll('[data-magnetic]').forEach((el) => {
-    const xTo = gsap.quickTo(el, 'x', { duration: 0.7, ease: 'elastic.out(1, 0.45)' });
-    const yTo = gsap.quickTo(el, 'y', { duration: 0.7, ease: 'elastic.out(1, 0.45)' });
-    const clamp = gsap.utils.clamp(-6, 6);
+    let rect = null;
+    el.addEventListener('pointerenter', () => {
+      rect = el.getBoundingClientRect();
+    });
     el.addEventListener('pointermove', (e) => {
-      if (!store.motion) return;
-      const r = el.getBoundingClientRect();
-      xTo(clamp((e.clientX - (r.left + r.width / 2)) * 0.2));
-      yTo(clamp((e.clientY - (r.top + r.height / 2)) * 0.3));
+      if (!store.motion || !rect) return;
+      const x = clamp((e.clientX - (rect.left + rect.width / 2)) * 0.2);
+      const y = clamp((e.clientY - (rect.top + rect.height / 2)) * 0.3);
+      el.style.translate = `${x.toFixed(1)}px ${y.toFixed(1)}px`;
     });
     el.addEventListener('pointerleave', () => {
-      xTo(0);
-      yTo(0);
+      el.style.translate = '';
+      rect = null;
     });
   });
 }
