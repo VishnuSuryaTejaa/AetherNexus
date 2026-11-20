@@ -46,8 +46,9 @@ const smoothstep = (e0, e1, x) => {
 
 const toLinear = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
 
-// Moonlight gradient map (sRGB 0–255): navy shadows → electric blue → frost
-// highlights, identical to the offline halftone; violet rim light
+// Tone ramp (sRGB 0–255): navy shadows → electric blue → frost highlights.
+// The portrait keeps the *luminance* of this ramp — the tuned exposure and
+// facial detail — while hue and saturation come from the photo itself
 const STOPS = [
   [0.0, [6, 10, 24]],
   [0.18, [14, 28, 72]],
@@ -57,6 +58,16 @@ const STOPS = [
   [1.0, [246, 250, 255]],
 ];
 const RIM = [176, 150, 255];
+
+const luminance = (r, g, b) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+const VIBRANCE = 1.16; // a touch of saturation around each colour's own luminance
+// The photo was shot at golden hour: a cooler white balance (linear-light
+// channel gains) keeps the skin natural instead of orange on the night page
+const WB = [0.9, 1.0, 1.12];
+// Cool moonlight fill for the shadows (hair, jacket), as unit-luminance chroma
+const COOL = [0.42, 0.5, 1.0].map(toLinear);
+const COOL_L = luminance(...COOL);
+const RIM_LIN = RIM.map((c) => toLinear(c / 255));
 
 function gradientMap(l) {
   l = Math.min(1, Math.max(0, l));
@@ -70,6 +81,13 @@ function gradientMap(l) {
     }
   }
   return STOPS[STOPS.length - 1][1].slice();
+}
+
+// Linear luminance of the tone ramp, as a 256-entry lookup
+const TONE = new Float32Array(256);
+for (let i = 0; i < 256; i++) {
+  const [r, g, b] = gradientMap(i / 255);
+  TONE[i] = luminance(toLinear(r / 255), toLinear(g / 255), toLinear(b / 255));
 }
 
 function boxBlur(src, w, h, r) {
@@ -154,17 +172,37 @@ export function samplePortrait(px, grid, rand) {
 
       const u = (x + 0.5 + (rand() - 0.5) * 0.85) / grid;
       const v = (y + 0.5 + (rand() - 0.5) * 0.85) / grid;
-      const focus = 0.58 + 0.42 * Math.exp(-((u - 0.52) ** 2 / 0.07 + (v - 0.4) ** 2 / 0.11));
+      const face = Math.exp(-((u - 0.52) ** 2 / 0.07 + (v - 0.4) ** 2 / 0.11));
+      const focus = 0.58 + 0.42 * face;
       const l2 = Math.min(1, Math.pow(lum, 0.85) * focus * 1.18);
       const rim = Math.max(0, 1 - Math.abs(alphaWide[i] - 0.5) * 2.4);
 
-      const gm = gradientMap(l2);
-      let cr = gm[0] * 0.9 + r * 255 * 0.1;
-      let cg = gm[1] * 0.9 + g * 255 * 0.1;
-      let cb = gm[2] * 0.9 + b * 255 * 0.1;
-      cr = cr * (1 - rim * 0.75) + RIM[0] * rim * 0.75;
-      cg = cg * (1 - rim * 0.75) + RIM[1] * rim * 0.75;
-      cb = cb * (1 - rim * 0.75) + RIM[2] * rim * 0.75;
+      // True colour: the photo's own hue as unit-luminance chroma (the floor
+      // keeps near-black pixels from blowing up); highlights roll off towards
+      // white the way film does
+      let pr = toLinear(r) * WB[0];
+      let pg = toLinear(g) * WB[1];
+      let pb = toLinear(b) * WB[2];
+      const pl = luminance(pr, pg, pb);
+      const sat = VIBRANCE * (1 - 0.4 * smoothstep(0.72, 1, l2));
+      pr = Math.max(0, pl + (pr - pl) * sat);
+      pg = Math.max(0, pl + (pg - pl) * sat);
+      pb = Math.max(0, pl + (pb - pl) * sat);
+      const norm = 1 / Math.max(luminance(pr, pg, pb), 0.02);
+      // Shadows take a cool moonlight fill; away from the face (hair, jacket)
+      // they are also lifted, so their texture reads on the night page instead
+      // of sinking into the tone curve's toe — the beard keeps its contrast
+      const shade = 1 - smoothstep(0.05, 0.45, l2);
+      const lift = shade * (1 - face);
+      const cool = shade * 0.66;
+      const T = TONE[Math.round(l2 * 255)] + 0.14 * lift;
+      let cr = (pr * norm * (1 - cool) + (COOL[0] / COOL_L) * cool) * T;
+      let cg = (pg * norm * (1 - cool) + (COOL[1] / COOL_L) * cool) * T;
+      let cb = (pb * norm * (1 - cool) + (COOL[2] / COOL_L) * cool) * T;
+      // violet rim light around the silhouette
+      cr = cr * (1 - rim * 0.75) + RIM_LIN[0] * rim * 0.75;
+      cg = cg * (1 - rim * 0.75) + RIM_LIN[1] * rim * 0.75;
+      cb = cb * (1 - rim * 0.75) + RIM_LIN[2] * rim * 0.75;
 
       // 2.5D relief: head ellipsoid + shoulders + a touch of luminance
       const hx = (u - 0.52) / 0.3;
@@ -177,10 +215,10 @@ export function samplePortrait(px, grid, rand) {
 
       // Contrast curve keeps facial detail; the tee/jacket below the face recedes
       const lower = 1 - 0.42 * smoothstep(0.66, 1.0, v);
-      const bright = Math.min(1, 0.08 + 0.98 * Math.pow(l2, 1.22) * lower + rim * 0.62) * smoothstep(0.3, 0.7, a);
+      const bright = Math.min(1, Math.max(0.08 + 0.98 * Math.pow(l2, 1.22) * lower, 0.34 * lift) + rim * 0.62) * smoothstep(0.3, 0.7, a);
 
       pos.push((u - 0.5) * 2, (0.5 - v) * 2, z);
-      col.push(toLinear(cr / 255), toLinear(cg / 255), toLinear(cb / 255), bright);
+      col.push(cr, cg, cb, bright);
     }
   }
 

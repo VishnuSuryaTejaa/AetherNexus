@@ -57,7 +57,7 @@ The phone number is deliberately left off the page; the résumé PDF stays avail
 
 ## 4. Visual system
 
-**Palette: moonlight.** Navy shadows rise through electric blue to frost highlights, with a violet rim light: cool and precise, so the portrait reads like a photograph lit by a screen at night.
+**Palette: moonlight.** The interface runs from navy through electric blue to frost, with a violet accent: cool and precise. The portrait is the one warm, full-colour element on the page, so it is the first thing the eye lands on.
 
 | Token | Hex | Use |
 |---|---|---|
@@ -123,13 +123,14 @@ Maps are generated in a Web Worker from ResizeObserver measurements (only for gl
 
 ## 7. Creative portrait treatment
 
-1. **Live particle portrait.** The transparent cutout is resampled into a jittered grid of particles, one per cell:
-   - Size and brightness follow light.
-   - A moonlight gradient map runs navy → electric blue → frost.
+1. **Live particle portrait, in true colour.** The transparent cutout is resampled into a jittered grid of particles, one per cell:
+   - Size and brightness follow light, along a tuned tone curve that keeps facial detail.
+   - Each particle carries the photo's own colour. The golden-hour cast is cooled slightly and the saturation lifted a touch, so skin stays natural rather than orange; highlights roll off towards white, as film does.
+   - A cinematic split: the warm face and cream tee against cool, moonlit shadows. Hair and jacket take a blue-violet fill, lifted away from the face so their texture reads on the night page.
    - A violet rim light is detected from the alpha edge.
    - A focus falloff keeps the face as the hero.
    - The portrait breathes and twinkles at under a third of the abstract formations' rate, so it holds still enough to read like a photograph.
-2. **Static "nano-halftone" portrait.** It's generated offline with the same palette, plus a dissolving lower edge, as if the particles are drifting off. It serves as the no-WebGL fallback and the social / Open Graph card.
+2. **Static "nano-halftone" portrait.** It's generated offline with the same colour grade, plus a dissolving lower edge, as if the particles are drifting off. It serves as the no-WebGL fallback, the contact avatar and the social / Open Graph card.
 
 ## 8. Motion spec
 
